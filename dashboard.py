@@ -1,108 +1,129 @@
-import os
-import re
-import json
+"""
+Iran Fire Watch — Streamlit Dashboard
+Real-time satellite active-fire detection & AI verification platform.
+"""
+
 import base64
+import json
 import logging
-from datetime import datetime, timedelta, timezone
+import time
+import uuid
+from datetime import datetime, time as dt_time, timezone, timedelta
 from pathlib import Path
+
+import folium
 import pandas as pd
 import streamlit as st
-import folium
 import streamlit.components.v1 as components
+
 from src.config import GEOJSON_PATH
 from src.db_client import DbClient
 from src.spatial_filter import SpatialFilter
 
-# Page configuration
+# ═══════════════════════════════════════════════════════════════
+# PAGE CONFIG
+# ═══════════════════════════════════════════════════════════════
 st.set_page_config(
-    page_title="Iran Fire Watch - سامانه پایش آتش‌سوزی",
+    page_title="Iran Fire Watch — سامانه پایش آتش‌سوزی",
     page_icon="🔥",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# ── Bilingual Translation Dictionary ──
-LANG = {
+# ═══════════════════════════════════════════════════════════════
+# TRANSLATIONS (pure text — no HTML)
+# ═══════════════════════════════════════════════════════════════
+T = {
     "en": {
-        "sidebar_title": "🔥 Iran Fire Watch",
-        "connected": "Connected to Supabase.",
-        "demo_mode": "Using simulated demo data.",
-        "data_sources": "<b>Data Sources</b><br/>NASA FIRMS (VIIRS 3-sat)<br/>Copernicus Sentinel-2<br/>Open-Meteo Weather API",
-        "pipeline_info": "<b>Pipeline v2</b><br/>Multi-sensor fusion<br/>DBSCAN clustering<br/>Composite scoring (0-100)",
-        "main_title": "🇮🇷 IRAN FOREST FIRE DETECTION PLATFORM",
-        "subtitle": "Real-Time Satellite Active Fire Trigger & AI Verification Early Warning System",
-        "stat_confirmed": "Active Confirmed Fires",
+        "sidebar_title": "Iran Fire Watch",
+        "connected": "Connected to database.",
+        "demo_mode": "Demo mode — simulated data.",
+        "data_sources": "NASA FIRMS (VIIRS 3-satellite)  ·  Copernicus Sentinel-2  ·  Open-Meteo Weather API",
+        "pipeline_info": "Pipeline v2: Multi-sensor fusion  ·  DBSCAN clustering  ·  Composite scoring (0–100)",
+        "visit_stats": "Visitor Analytics",
+        "active_visitors": "Active Visitors",
+        "total_visitors": "Total Visitors",
+        "main_title": "Iran Forest Fire Detection Platform",
+        "subtitle": "Real‑time satellite active‑fire trigger & AI‑verified early‑warning system",
+        "stat_confirmed": "Active Fires",
         "stat_pending": "Awaiting Verification",
-        "stat_false": "False Alarms Filtered",
-        "stat_resolved": "Resolved / Extinguished",
-        "stat_sirocco": "Extreme Wind Risks",
-        "stat_visitors": "Total Visitors",
-        "stat_active_visitors": "Active Visitors",
-        "visitor_analytics": "Visitor Analytics",
-        "map_title": "🔥 Active Fire Location Map",
-
-        "filter_status": "Alert Status",
-        "filter_wilaya": "Province (Ostan)",
+        "stat_false": "False Alarms",
+        "stat_resolved": "Resolved",
+        "stat_sirocco": "Extreme Wind Risk",
+        "filter_status": "Status",
+        "filter_province": "Province",
         "filter_frp": "Min FRP (MW)",
-        "all_wilayas": "All provinces",
-        "warnings_title": "🚨 Real-Time Warnings",
-        "filter_date": "Date Range",
-        "filter_by_wilaya": "Filter by Province",
-        "no_fires": "No active fire triggers found for selected criteria.",
-        "fire_confirmed": "Fire Confirmed",
-        "thermal_pending": "Thermal Anomaly Awaiting Verification",
-        "false_alarm": "False Alarm Filtered",
-        "resolved_fire": "Resolved / Extinguished",
-        "wilaya": "Province",
+        "filter_all": "All",
+        "warnings_title": "Warnings & Log",
+        "no_data": "No fires match the selected filters.",
+        "fire_confirmed": "Confirmed Fire",
+        "thermal_pending": "Pending Verification",
+        "false_alarm": "False Positive",
+        "resolved_fire": "Resolved",
+        "province": "Province",
         "coordinates": "Coordinates",
-        "detection": "Detection",
+        "detection": "Detected",
         "risk_score": "Risk Score",
         "frp": "FRP",
         "confidence": "Confidence",
         "time": "Time",
-        "temp": "Temp",
+        "temp": "Temperature",
         "humidity": "Humidity",
         "wind": "Wind",
-        "risk": "Risk",
+        "risk": "Fire Risk",
         "sentinel_quicklook": "Sentinel-2 Quicklook",
-        "confirmed_fire_lbl": "Confirmed Forest Fire",
-        "pending_lbl": "Pending Sentinel Verification",
-        "false_positive_lbl": "False Positive Filtered",
-        "resolved_lbl": "Resolved / Extinguished",
-        "footer": "Iran Forest Fire detection and early warning platform. Data Source: NASA FIRMS (VIIRS/MODIS) | Copernicus Sentinel-2 | Open-Meteo.",
-        "lang_label": "Language / زبان",
+        "footer": "Iran Forest Fire detection & early-warning platform. Data: NASA FIRMS (VIIRS/MODIS) | Copernicus Sentinel-2 | Open‑Meteo.",
+        "verification_title": "Ground Verification & Citizen Fire Report",
+        "verification_subtitle": "Report an active fire or confirm a satellite detection. Photo proof is mandatory.",
+        "submit_report": "Submit Report",
+        "reporter_label": "Reporter Category",
+        "reporter_name": "Reporter Name (optional)",
+        "severity_label": "Fire Severity",
+        "loc_method": "Location Input Method",
+        "gps_auto": "GPS Auto‑Detect",
+        "manual_coords": "Province & Manual Coordinates",
+        "photos_required": "Photo Proof (mandatory)",
+        "upload_photo": "Upload Photo",
+        "take_snapshot": "Take Camera Snapshot",
+        "desc_label": "Description & Notes",
+        "report_success": "Report submitted successfully. Report ID: {id}. Thank you for protecting Iran's forests.",
+        "report_err_photo": "You must upload a photo or take a camera snapshot to submit a report.",
+        "report_err_general": "Failed to record report: {err}",
+        "citizen": "Local Citizen",
+        "ranger": "Forest Ranger",
+        "fire_dept": "Fire Department",
+        "severity_smoke": "Active Smoke Plume",
+        "severity_flames": "Visible Flames Spreading",
+        "severity_ext": "Extinguished",
+        "date_range": "Date Range",
     },
     "fa": {
-        "sidebar_title": "🔥 پایش آتش‌سوزی ایران",
+        "sidebar_title": "پایش آتش‌سوزی ایران",
         "connected": "متصل به پایگاه داده.",
         "demo_mode": "حالت نمایشی — داده‌های شبیه‌سازی شده.",
-        "data_sources": "<b>منابع داده</b><br/>NASA FIRMS (3 ماهواره VIIRS)<br/>Copernicus Sentinel-2<br/>Open-Meteo هواشناسی",
-        "pipeline_info": "<b>خط پردازش v2</b><br/>ادغام چند حسگری<br/>خوشه‌بندی DBSCAN<br/>امتیازدهی ترکیبی (0-100)",
-        "main_title": "🇮🇷 سامانه پایش آتش‌سوزی جنگل‌های ایران",
+        "data_sources": "NASA FIRMS (سه ماهواره VIIRS)  ·  Copernicus Sentinel-2  ·  Open-Meteo هواشناسی",
+        "pipeline_info": "خط پردازش v2: ادغام چندحسگری  ·  خوشه‌بندی DBSCAN  ·  امتیازدهی ترکیبی (۰–۱۰۰)",
+        "visit_stats": "آمار بازدید",
+        "active_visitors": "بازدیدکنندگان فعال",
+        "total_visitors": "کل بازدیدکنندگان",
+        "main_title": "سامانه پایش آتش‌سوزی جنگل‌های ایران",
         "subtitle": "سامانه هشدار زودهنگام مبتنی بر ماهواره و هوش مصنوعی",
-        "stat_confirmed": "آتش‌سوزی‌های تأیید شده",
+        "stat_confirmed": "آتش‌سوزی‌های فعال",
         "stat_pending": "در انتظار تأیید",
         "stat_false": "هشدارهای کذب",
         "stat_resolved": "خاموش شده",
         "stat_sirocco": "خطر باد شدید",
-        "stat_visitors": "کل بازدیدکنندگان",
-        "stat_active_visitors": "بازدیدکنندگان فعال",
-        "visitor_analytics": "آمار بازدید",
-        "map_title": "🔥 نقشه موقعیت آتش‌سوزی‌های فعال",
-
-        "filter_status": "وضعیت هشدار",
-        "filter_wilaya": "استان",
+        "filter_status": "وضعیت",
+        "filter_province": "استان",
         "filter_frp": "حداقل FRP (MW)",
-        "all_wilayas": "همه استان‌ها",
-        "warnings_title": "🚨 هشدارهای لحظه‌ای",
-        "filter_date": "بازه زمانی",
-        "filter_by_wilaya": "فیلتر بر اساس استان",
-        "no_fires": "آتش‌سوزی فعالی برای معیارهای انتخاب شده یافت نشد.",
+        "filter_all": "همه",
+        "warnings_title": "هشدارها و گزارش",
+        "no_data": "آتش‌سوزی فعالی برای معیارهای انتخاب شده یافت نشد.",
         "fire_confirmed": "آتش‌سوزی تأیید شده",
-        "thermal_pending": "ناهنجاری حرارتی در انتظار تأیید",
+        "thermal_pending": "در انتظار تأیید",
         "false_alarm": "هشدار کذب",
         "resolved_fire": "خاموش شده",
-        "wilaya": "استان",
+        "province": "استان",
         "coordinates": "مختصات",
         "detection": "زمان تشخیص",
         "risk_score": "امتیاز خطر",
@@ -114,756 +135,835 @@ LANG = {
         "wind": "باد",
         "risk": "خطر",
         "sentinel_quicklook": "تصویر Sentinel-2",
-        "confirmed_fire_lbl": "آتش‌سوزی جنگلی تأیید شده",
-        "pending_lbl": "در انتظار تأیید ماهواره‌ای",
-        "false_positive_lbl": "هشدار کذب",
-        "resolved_lbl": "خاموش شده",
-        "footer": "سامانه پایش و هشدار زودهنگام آتش‌سوزی جنگل‌های ایران. منابع داده: NASA FIRMS | Copernicus Sentinel-2 | Open-Meteo.",
-        "lang_label": "Language / زبان",
-    }
+        "footer": "سامانه پایش و هشدار زودهنگام آتش‌سوزی جنگل‌های ایران. منابع داده: NASA FIRMS | Copernicus Sentinel-2 | Open‑Meteo.",
+        "verification_title": "گزارش میدانی و تأیید آتش‌سوزی",
+        "verification_subtitle": "گزارش آتش‌سوزی فعال یا تأیید تشخیص ماهواره‌ای. تصویر الزامی است.",
+        "submit_report": "ارسال گزارش",
+        "reporter_label": "نوع گزارش‌دهنده",
+        "reporter_name": "نام گزارش‌دهنده (اختیاری)",
+        "severity_label": "شدت آتش‌سوزی",
+        "loc_method": "روش تعیین موقعیت",
+        "gps_auto": "تشخیص خودکار GPS",
+        "manual_coords": "انتخاب استان و مختصات",
+        "photos_required": "تصویر (الزامی)",
+        "upload_photo": "بارگذاری تصویر",
+        "take_snapshot": "عکس با دوربین",
+        "desc_label": "توضیحات",
+        "report_success": "گزارش با موفقیت ثبت شد. شماره گزارش: {id}. از شما برای حفاظت از جنگل‌های ایران سپاسگزاریم.",
+        "report_err_photo": "برای ارسال گزارش باید تصویر بارگذاری یا عکس بگیرید.",
+        "report_err_general": "خطا در ثبت گزارش: {err}",
+        "citizen": "شهروند",
+        "ranger": "محیط‌بان",
+        "fire_dept": "آتش‌نشانی",
+        "severity_smoke": "دود فعال",
+        "severity_flames": "شعله‌های قابل مشاهده",
+        "severity_ext": "خاموش شده",
+        "date_range": "بازه زمانی",
+    },
 }
 
-# Premium Custom CSS Injection for Dark/Glassmorphism Theme
-st.markdown("""
+# ═══════════════════════════════════════════════════════════════
+# CSS — Centralized dark glassmorphism theme
+# ═══════════════════════════════════════════════════════════════
+CSS = r"""
 <style>
+/* ── Fonts ── */
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600&display=swap');
 
-/* Main app background */
+/* ── Base ── */
+:root {
+    --bg-primary:   #090c10;
+    --bg-card:      rgba(15, 20, 28, 0.75);
+    --border-card:  rgba(255, 255, 255, 0.06);
+    --text-primary: #e2e8f0;
+    --text-muted:   #94a3b8;
+    --text-dim:     #64748b;
+    --red:          #f43f5e;
+    --amber:        #f59e0b;
+    --emerald:      #10b981;
+    --blue:         #3b82f6;
+    --cyan:         #06b6d4;
+    --slate:        #64748b;
+}
+
 .stApp {
-    background-color: #0b0d10;
-    background-image: radial-gradient(circle at 10% 20%, rgba(244, 63, 94, 0.06) 0%, rgba(0, 0, 0, 0) 90%), 
-                      radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.03) 0%, rgba(0, 0, 0, 0) 90%);
-    color: #e2e8f0;
-    font-family: 'Outfit', 'Vazirmatn', sans-serif;
+    background-color: var(--bg-primary);
+    background-image:
+        radial-gradient(circle at 10% 20%, rgba(244, 63, 94, 0.04) 0%, transparent 90%),
+        radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.03) 0%, transparent 90%);
+    color: var(--text-primary);
+    font-family: 'Outfit', 'Vazirmatn', 'Noto Naskh Arabic', sans-serif;
 }
 
-/* Sidebar styling */
 section[data-testid="stSidebar"] {
-    background-color: #0e1217 !important;
-    border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+    background-color: #0c1016 !important;
+    border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
 }
 
-/* Custom cards styling */
-.glass-card {
-    background: rgba(18, 24, 32, 0.7);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 16px;
-    padding: 20px;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    margin-bottom: 20px;
-}
-.glass-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(244, 63, 94, 0.3);
-    box-shadow: 0 12px 40px 0 rgba(244, 63, 94, 0.1);
-}
-
-/* Stat Text Styling */
-.stat-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: #94a3b8;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-}
-.stat-value {
-    font-size: 38px;
-    font-weight: 700;
-    margin-top: 8px;
-    background: linear-gradient(135deg, #f43f5e 0%, #f59e0b 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-.stat-value-green {
-    font-size: 38px;
-    font-weight: 700;
-    margin-top: 8px;
-    background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-.stat-value-gray {
-    font-size: 38px;
-    font-weight: 700;
-    margin-top: 8px;
-    color: #64748b;
-}
-
-/* Subtitle and header formatting */
-h1, h2, h3 {
+/* ── Typography ── */
+h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', 'Vazirmatn', sans-serif !important;
     font-weight: 700 !important;
 }
 
-/* Streamlit defaults replacement */
-.stAlert {
-    background: rgba(220, 38, 38, 0.1) !important;
-    border: 1px solid rgba(220, 38, 38, 0.3) !important;
-    color: #fca5a5 !important;
-    border-radius: 12px !important;
+/* ── Cards ── */
+.glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-card);
+    border-radius: 16px;
+    padding: 20px 18px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    margin-bottom: 16px;
+    height: 100%;
+    transition: border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+.glass-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(244, 63, 94, 0.25);
+    box-shadow: 0 12px 40px rgba(244, 63, 94, 0.08);
 }
 
+/* ── Stat cards ── */
+.stat-card-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 6px;
+}
+.stat-card-value {
+    font-size: 34px;
+    font-weight: 700;
+    line-height: 1.1;
+}
+.stat-card-sub {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-top: 4px;
+}
+
+.text-red    { background: linear-gradient(135deg, #f43f5e 0%, #b91c1c 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.text-amber  { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.text-emerald{ background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.text-slate  { color: var(--slate); }
+.text-danger { background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); background-clip: text; -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+/* ── Warning cards ── */
+.warn-card {
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+}
+.warn-card-title {
+    font-weight: 600;
+    font-size: 15px;
+    margin-bottom: 6px;
+}
+.warn-card-detail {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+/* ── Sidebar visitor badge ── */
+.sidebar-badge {
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 16px;
+}
+.sidebar-badge-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--emerald);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 8px;
+}
+.sidebar-badge-row {
+    font-size: 13px;
+    color: var(--text-primary);
+    margin-bottom: 2px;
+}
+
+/* ── RTL ── */
+.rtl { direction: rtl; text-align: right; }
+.ltr { direction: ltr; text-align: left; }
+
+/* ── Divider ── */
+hr.divider { border: 0; border-top: 1px solid rgba(255, 255, 255, 0.06); margin: 20px 0; }
+
+/* ── Footer ── */
+.footer { text-align: center; color: var(--text-dim); font-size: 12px; margin-top: 8px; }
+
+/* ── Streamlit overrides ── */
+.stAlert {
+    background: rgba(220, 38, 38, 0.1) !important;
+    border: 1px solid rgba(220, 38, 38, 0.25) !important;
+    border-radius: 12px !important;
+}
 .stProgress > div > div > div > div {
     background: linear-gradient(90deg, #f43f5e, #f59e0b) !important;
 }
-
-/* RTL support for Persian */
-.rtl { direction: rtl; text-align: right; }
 </style>
-""", unsafe_allow_html=True)
+"""
 
-# Add zero-dependency HTML auto-refresh (refreshes the page every 120 seconds)
-st.markdown(
-    '<meta http-equiv="refresh" content="120">',
-    unsafe_allow_html=True
-)
+st.markdown(CSS, unsafe_allow_html=True)
 
-# ── Province (Ostan) lookup ──
-WILAYA_BOUNDS = {
-    "Mazandaran / مازندران": {"lat": (35.80, 36.95), "lon": (50.50, 54.20)},
-    "Gilan / گیلان": {"lat": (36.50, 38.00), "lon": (48.50, 50.50)},
-    "Golestan / گلستان": {"lat": (36.50, 38.10), "lon": (54.00, 56.50)},
-    "Ardabil / اردبیل": {"lat": (37.20, 39.30), "lon": (47.40, 48.80)},
-    "East Azerbaijan / آذربایجان شرقی": {"lat": (37.00, 39.30), "lon": (45.50, 48.30)},
-    "West Azerbaijan / آذربایجان غربی": {"lat": (36.00, 39.30), "lon": (44.00, 47.00)},
-    "Kurdistan / کردستان": {"lat": (34.80, 36.50), "lon": (45.50, 48.20)},
-    "Kermanshah / کرمانشاه": {"lat": (33.50, 35.30), "lon": (45.50, 48.00)},
-    "Lorestan / لرستان": {"lat": (32.80, 34.50), "lon": (47.00, 50.00)},
-    "Ilam / ایلام": {"lat": (31.80, 34.00), "lon": (45.50, 48.00)},
+# ═══════════════════════════════════════════════════════════════
+# PROVINCE (OSTAN) LOOKUP
+# ═══════════════════════════════════════════════════════════════
+PROVINCE_BOUNDS = {
+    "Mazandaran / مازندران":                  {"lat": (35.80, 36.95), "lon": (50.50, 54.20)},
+    "Gilan / گیلان":                           {"lat": (36.50, 38.00), "lon": (48.50, 50.50)},
+    "Golestan / گلستان":                       {"lat": (36.50, 38.10), "lon": (54.00, 56.50)},
+    "Ardabil / اردبیل":                        {"lat": (37.20, 39.30), "lon": (47.40, 48.80)},
+    "East Azerbaijan / آذربایجان شرقی":        {"lat": (37.00, 39.30), "lon": (45.50, 48.30)},
+    "West Azerbaijan / آذربایجان غربی":        {"lat": (36.00, 39.30), "lon": (44.00, 47.00)},
+    "Kurdistan / کردستان":                     {"lat": (34.80, 36.50), "lon": (45.50, 48.20)},
+    "Kermanshah / کرمانشاه":                   {"lat": (33.50, 35.30), "lon": (45.50, 48.00)},
+    "Lorestan / لرستان":                       {"lat": (32.80, 34.50), "lon": (47.00, 50.00)},
+    "Ilam / ایلام":                             {"lat": (31.80, 34.00), "lon": (45.50, 48.00)},
     "Chaharmahal & Bakhtiari / چهارمحال و بختیاری": {"lat": (31.50, 32.80), "lon": (49.50, 51.30)},
     "Kohgiluyeh & Boyer-Ahmad / کهگیلویه و بویراحمد": {"lat": (30.30, 31.70), "lon": (50.20, 51.80)},
-    "Fars / فارس": {"lat": (28.50, 31.50), "lon": (51.00, 55.00)},
-    "North Khorasan / خراسان شمالی": {"lat": (36.50, 38.30), "lon": (56.00, 58.50)},
-    "Razavi Khorasan / خراسان رضوی": {"lat": (34.00, 37.50), "lon": (56.50, 61.50)},
-    "Semnan / سمنان": {"lat": (34.50, 37.30), "lon": (52.00, 57.00)},
-    "Tehran / تهران": {"lat": (35.30, 36.40), "lon": (50.70, 52.00)},
-    "Alborz / البرز": {"lat": (35.70, 36.30), "lon": (50.50, 51.50)},
-    "Qazvin / قزوین": {"lat": (35.60, 36.80), "lon": (48.80, 50.60)},
-    "Zanjan / زنجان": {"lat": (35.60, 37.30), "lon": (47.10, 49.50)},
-    "Hamadan / همدان": {"lat": (34.20, 35.70), "lon": (47.70, 49.50)},
-    "Markazi / مرکزی": {"lat": (33.60, 35.50), "lon": (48.50, 51.00)},
-    "Isfahan / اصفهان": {"lat": (31.00, 34.50), "lon": (50.00, 55.50)},
-    "Yazd / یزد": {"lat": (29.50, 34.00), "lon": (52.50, 58.00)},
-    "Kerman / کرمان": {"lat": (26.50, 31.50), "lon": (54.50, 60.00)},
-    "Hormozgan / هرمزگان": {"lat": (25.50, 28.50), "lon": (52.50, 59.50)},
-    "Bushehr / بوشهر": {"lat": (27.20, 30.30), "lon": (50.00, 53.00)},
-    "Khuzestan / خوزستان": {"lat": (29.50, 33.00), "lon": (47.50, 51.00)},
+    "Fars / فارس":                             {"lat": (28.50, 31.50), "lon": (51.00, 55.00)},
+    "North Khorasan / خراسان شمالی":           {"lat": (36.50, 38.30), "lon": (56.00, 58.50)},
+    "Razavi Khorasan / خراسان رضوی":           {"lat": (34.00, 37.50), "lon": (56.50, 61.50)},
+    "Semnan / سمنان":                           {"lat": (34.50, 37.30), "lon": (52.00, 57.00)},
+    "Tehran / تهران":                           {"lat": (35.30, 36.40), "lon": (50.70, 52.00)},
+    "Alborz / البرز":                           {"lat": (35.70, 36.30), "lon": (50.50, 51.50)},
+    "Qazvin / قزوین":                           {"lat": (35.60, 36.80), "lon": (48.80, 50.60)},
+    "Zanjan / زنجان":                           {"lat": (35.60, 37.30), "lon": (47.10, 49.50)},
+    "Hamadan / همدان":                          {"lat": (34.20, 35.70), "lon": (47.70, 49.50)},
+    "Markazi / مرکزی":                          {"lat": (33.60, 35.50), "lon": (48.50, 51.00)},
+    "Isfahan / اصفهان":                         {"lat": (31.00, 34.50), "lon": (50.00, 55.50)},
+    "Yazd / یزد":                               {"lat": (29.50, 34.00), "lon": (52.50, 58.00)},
+    "Kerman / کرمان":                           {"lat": (26.50, 31.50), "lon": (54.50, 60.00)},
+    "Hormozgan / هرمزگان":                      {"lat": (25.50, 28.50), "lon": (52.50, 59.50)},
+    "Bushehr / بوشهر":                          {"lat": (27.20, 30.30), "lon": (50.00, 53.00)},
+    "Khuzestan / خوزستان":                      {"lat": (29.50, 33.00), "lon": (47.50, 51.00)},
     "Sistan & Baluchestan / سیستان و بلوچستان": {"lat": (25.00, 31.50), "lon": (58.50, 63.30)},
-    "South Khorasan / خراسان جنوبی": {"lat": (31.00, 34.50), "lon": (56.50, 61.00)},
-    "Qom / قم": {"lat": (34.20, 35.20), "lon": (50.20, 51.70)},
+    "South Khorasan / خراسان جنوبی":            {"lat": (31.00, 34.50), "lon": (56.50, 61.00)},
+    "Qom / قم":                                 {"lat": (34.20, 35.20), "lon": (50.20, 51.70)},
 }
 
 
-def get_wilaya(lat, lon):
-    for name, bounds in WILAYA_BOUNDS.items():
+def get_province(lat: float, lon: float) -> str:
+    """Reverse-geocode a coordinate to the nearest Iranian province (ostan)."""
+    for name, bounds in PROVINCE_BOUNDS.items():
         if bounds["lat"][0] <= lat <= bounds["lat"][1] and bounds["lon"][0] <= lon <= bounds["lon"][1]:
             return name
     if lat > 36.0:
         return "Alborz Range / رشته کوه البرز"
-    elif lat > 32.0:
+    if lat > 32.0:
         return "Zagros Mountains / رشته کوه زاگرس"
-    else:
-        return "Southern Iran / جنوب ایران"
+    return "Southern Iran / جنوب ایران"
 
-# ── Mock Data ──
-def get_mock_data():
-    now = datetime.now(timezone.utc)
-    return [
-        {"id": 1, "latitude": 36.712, "longitude": 51.420, "frp": 124.5, "confidence": 92,
-         "acquisition_time": now - timedelta(hours=2), "status": "CONFIRMED", "temp": 41.2,
-         "humidity": 14.5, "wind_speed": 32.4, "wind_direction": 185.0, "risk_score": 94.0,
-         "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 2, "latitude": 37.258, "longitude": 49.581, "frp": 68.2, "confidence": 78,
-         "acquisition_time": now - timedelta(hours=4), "status": "CONFIRMED", "temp": 39.5,
-         "humidity": 18.0, "wind_speed": 22.0, "wind_direction": 170.0, "risk_score": 82.0,
-         "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 3, "latitude": 36.802, "longitude": 54.461, "frp": 25.1, "confidence": 62,
-         "acquisition_time": now - timedelta(minutes=45), "status": "PENDING", "temp": 38.0,
-         "humidity": 21.0, "wind_speed": 18.5, "wind_direction": 110.0, "risk_score": 45.0,
-         "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 4, "latitude": 33.425, "longitude": 48.271, "frp": 12.4, "confidence": 55,
-         "acquisition_time": now - timedelta(hours=10), "status": "FALSE_POSITIVE", "temp": 36.8,
-         "humidity": 24.5, "wind_speed": 12.0, "wind_direction": 90.0, "risk_score": 28.0,
-         "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 5, "latitude": 36.650, "longitude": 51.590, "frp": 85.0, "confidence": 88,
-         "acquisition_time": now - timedelta(days=2), "status": "RESOLVED", "temp": 40.0,
-         "humidity": 16.0, "wind_speed": 25.0, "wind_direction": 190.0, "risk_score": 90.0,
-         "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-    ]
 
-# ── DB Fetch ──
-@st.cache_data(ttl=30)
-def fetch_fires_from_db(db_url):
+# ═══════════════════════════════════════════════════════════════
+# DATA LOADING
+# ═══════════════════════════════════════════════════════════════
+MOCK_FIRES = [
+    {"id": 1, "latitude": 36.712, "longitude": 51.420, "frp": 124.5, "confidence": 92,
+     "acquisition_time": datetime.now(timezone.utc) - timedelta(hours=2), "status": "CONFIRMED",
+     "temp": 41.2, "humidity": 14.5, "wind_speed": 32.4, "wind_direction": 185.0, "risk_score": 94.0,
+     "product_id": None, "quicklook_url": None, "telegram_message_id": None},
+    {"id": 2, "latitude": 37.258, "longitude": 49.581, "frp": 68.2, "confidence": 78,
+     "acquisition_time": datetime.now(timezone.utc) - timedelta(hours=4), "status": "CONFIRMED",
+     "temp": 39.5, "humidity": 18.0, "wind_speed": 22.0, "wind_direction": 170.0, "risk_score": 82.0,
+     "product_id": None, "quicklook_url": None, "telegram_message_id": None},
+    {"id": 3, "latitude": 36.802, "longitude": 54.461, "frp": 25.1, "confidence": 62,
+     "acquisition_time": datetime.now(timezone.utc) - timedelta(minutes=45), "status": "PENDING",
+     "temp": 38.0, "humidity": 21.0, "wind_speed": 18.5, "wind_direction": 110.0, "risk_score": 45.0,
+     "product_id": None, "quicklook_url": None, "telegram_message_id": None},
+    {"id": 4, "latitude": 33.425, "longitude": 48.271, "frp": 12.4, "confidence": 55,
+     "acquisition_time": datetime.now(timezone.utc) - timedelta(hours=10), "status": "FALSE_POSITIVE",
+     "temp": 36.8, "humidity": 24.5, "wind_speed": 12.0, "wind_direction": 90.0, "risk_score": 28.0,
+     "product_id": None, "quicklook_url": None, "telegram_message_id": None},
+    {"id": 5, "latitude": 36.650, "longitude": 51.590, "frp": 85.0, "confidence": 88,
+     "acquisition_time": datetime.now(timezone.utc) - timedelta(days=2), "status": "RESOLVED",
+     "temp": 40.0, "humidity": 16.0, "wind_speed": 25.0, "wind_direction": 190.0, "risk_score": 90.0,
+     "product_id": None, "quicklook_url": None, "telegram_message_id": None},
+]
+
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _fetch_fires_impl(db_url: str) -> list | None:
+    """Cached database fetch."""
     try:
         client = DbClient(db_url)
         return client.get_all_fires(limit=300)
-    except Exception as e:
-        logging.getLogger("dashboard").error(f"Failed to fetch fires from DB: {e}", exc_info=True)
+    except Exception:
+        logging.getLogger("dashboard").exception("DB fetch failed")
         return None
 
-db_configured = False
-fires = []
 
-db_client = DbClient()
-if db_client.db_url and "change-me" not in db_client.db_url:
-    try:
-        res = fetch_fires_from_db(db_client.db_url)
-        if res is not None:
-            fires = res
-            db_configured = True
-    except Exception as e:
-        logging.getLogger("dashboard").error(f"Database connection error: {e}", exc_info=True)
+def load_fires() -> tuple[pd.DataFrame, bool]:
+    """Load fire records (DB or mock), apply spatial filter, compute provinces."""
+    db_client = DbClient()
+    db_configured = bool(db_client.db_url and "change-me" not in db_client.db_url)
 
-if not db_configured:
-    fires = get_mock_data()
+    fires: list[dict] = []
+    if db_configured:
+        with st.spinner("Loading fires…"):
+            result = _fetch_fires_impl(db_client.db_url)
+            if result is not None:
+                fires = result
+            else:
+                db_configured = False
 
-spatial = SpatialFilter()
-fires = [f for f in fires if spatial.is_in_forest_zone(
-    float(f.get("latitude", 0)), float(f.get("longitude", 0))
-)]
+    if not fires:
+        fires = MOCK_FIRES
+        db_configured = False
 
-df = pd.DataFrame(fires)
+    # Spatial filter
+    spatial = SpatialFilter()
+    fires = [f for f in fires if spatial.is_in_forest_zone(
+        float(f.get("latitude", 0)), float(f.get("longitude", 0)))]
 
-if not df.empty and "acquisition_time" in df.columns:
-    df["acquisition_time"] = pd.to_datetime(df["acquisition_time"], utc=True)
+    df = pd.DataFrame(fires)
+    if not df.empty and "acquisition_time" in df.columns:
+        df["acquisition_time"] = pd.to_datetime(df["acquisition_time"], utc=True)
+    if not df.empty:
+        df["province"] = df.apply(
+            lambda r: get_province(float(r["latitude"]), float(r["longitude"])), axis=1)
 
-if not df.empty:
-    df["wilaya"] = df.apply(lambda r: get_wilaya(float(r["latitude"]), float(r["longitude"])), axis=1)
+    return df, db_configured
 
-# ── Visitor Analytics Tracker ──
-VISITOR_FILE = Path(__file__).resolve().parent / "visitor_stats.json"
 
-class VisitorTracker:
-    _instance = None
-    
+df, DB_CONNECTED = load_fires()
+
+# ═══════════════════════════════════════════════════════════════
+# VISITOR TRACKER
+# ═══════════════════════════════════════════════════════════════
+_VISITOR_FILE = Path(__file__).resolve().parent / "visitor_stats.json"
+
+
+class _VisitorTracker:
+    """Singleton visitor counter persisted to disk."""
+
+    _instance: "_VisitorTracker | None" = None
+
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(VisitorTracker, cls).__new__(cls)
-            cls._instance.total_count, cls._instance.active_sessions = cls._load_stats()
+            cls._instance = super().__new__(cls)
+            cls._instance._total, cls._instance._sessions = cls._load()
         return cls._instance
 
-    @classmethod
-    def _load_stats(cls):
+    @staticmethod
+    def _load():
         try:
-            if VISITOR_FILE.exists():
-                with open(VISITOR_FILE, "r") as f:
-                    data = json.load(f)
-                    total = data.get("total_visitors", 1285)
-                    sessions = data.get("active_sessions", {})
-                    return total, sessions
+            if _VISITOR_FILE.exists():
+                data = json.loads(_VISITOR_FILE.read_text())
+                return data.get("total_visitors", 0), data.get("active_sessions", {})
         except Exception:
             pass
         return 1285, {}
 
-    @classmethod
-    def _save_stats(cls, count, sessions):
+    @staticmethod
+    def _save(total: int, sessions: dict):
         try:
-            with open(VISITOR_FILE, "w") as f:
-                json.dump({
-                    "total_visitors": count,
-                    "active_sessions": sessions,
-                    "updated_at": datetime.now().isoformat()
-                }, f)
+            _VISITOR_FILE.write_text(json.dumps({
+                "total_visitors": total,
+                "active_sessions": sessions,
+                "updated_at": datetime.now().isoformat(),
+            }))
         except Exception:
             pass
 
-    def track(self, session_id):
-        import time
-        now_ts = time.time()
-        # Reload latest stats from disk to sync across requests
-        disk_total, disk_sessions = self._load_stats()
-        if disk_total > self.total_count:
-            self.total_count = disk_total
-        
-        self.active_sessions.update(disk_sessions)
-        
-        # Prune inactive sessions older than 300s (5 minutes)
-        self.active_sessions = {s: t for s, t in self.active_sessions.items() if now_ts - float(t) < 300}
-        
-        if session_id not in self.active_sessions:
-            self.total_count += 1
-            
-        self.active_sessions[session_id] = now_ts
-        self._save_stats(self.total_count, self.active_sessions)
-        return self.total_count, max(1, len(self.active_sessions))
+    def track(self, session_id: str) -> tuple[int, int]:
+        now = time.time()
+        disk_total, disk_sessions = self._load()
+        if disk_total > self._total:
+            self._total = disk_total
+        self._sessions.update(disk_sessions)
+
+        # Prune sessions older than 5 minutes
+        self._sessions = {s: t for s, t in self._sessions.items() if now - float(t) < 300}
+
+        if session_id not in self._sessions:
+            self._total += 1
+        self._sessions[session_id] = now
+        self._save(self._total, self._sessions)
+        return self._total, max(1, len(self._sessions))
+
 
 if "session_id" not in st.session_state:
-    import uuid
     st.session_state["session_id"] = str(uuid.uuid4())
 
-tracker = VisitorTracker()
-total_visitors, active_visitors = tracker.track(st.session_state["session_id"])
+visitor = _VisitorTracker()
+TOTAL_VISITORS, ACTIVE_VISITORS = visitor.track(st.session_state["session_id"])
 
-
-
-# ── Sidebar with Language Toggle ──
-lang_choice = st.sidebar.radio("Language / زبان", ["English", "فارسی"], index=0, key="lang_toggle", horizontal=True)
+# ═══════════════════════════════════════════════════════════════
+# SIDEBAR
+# ═══════════════════════════════════════════════════════════════
+lang_choice = st.sidebar.radio(
+    "Language / زبان", ["English", "فارسی"],
+    index=0, key="lang_toggle", horizontal=True,
+)
 lang = "fa" if lang_choice == "فارسی" else "en"
-t = LANG[lang]
-text_dir = "rtl" if lang == "fa" else "ltr"
+t = T[lang]
+dir_cls = "rtl" if lang == "fa" else "ltr"
 
-st.sidebar.markdown(f"<h2 style='text-align: center;'>{t['sidebar_title']}</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
+st.sidebar.markdown(
+    f"<h3 class='{dir_cls}' style='margin-bottom:0;'>{t['sidebar_title']}</h3>",
+    unsafe_allow_html=True,
+)
 
-if db_configured:
-    st.sidebar.success(t["connected"])
+# Connection status
+if DB_CONNECTED:
+    st.sidebar.success(t["connected"], icon="✅")
 else:
-    st.sidebar.warning(t["demo_mode"])
+    st.sidebar.warning(t["demo_mode"], icon="⚠️")
 
-st.sidebar.markdown("---")
-
-# Sidebar Visitor Card
+# Visitor badge
 st.sidebar.markdown(f"""
-<div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 12px; padding: 12px; margin-bottom: 15px; direction: {text_dir};">
-    <div style="font-size: 11px; font-weight: 600; color: #10b981; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">
-        📊 {t['visitor_analytics']}
-    </div>
-    <div style="font-size: 13px; color: #e2e8f0;">
-        🟢 <b>{t['stat_active_visitors']}:</b> <span style="color:#10b981; font-weight:700;">{active_visitors}</span><br/>
-        👁️ <b>{t['stat_visitors']}:</b> <span style="color:#3b82f6; font-weight:700;">{total_visitors:,}</span>
-    </div>
+<div class="sidebar-badge {dir_cls}">
+    <div class="sidebar-badge-title">📊 {t['visit_stats']}</div>
+    <div class="sidebar-badge-row">🟢 <b>{t['active_visitors']}:</b> <span style="color:var(--emerald);font-weight:700;">{ACTIVE_VISITORS}</span></div>
+    <div class="sidebar-badge-row">👁 <b>{t['total_visitors']}:</b> <span style="color:var(--blue);font-weight:700;">{TOTAL_VISITORS:,}</span></div>
 </div>
-""", unsafe_allow_html=True)
-
-st.sidebar.markdown(f"""
-<div style="font-size: 12px; color: #64748b; direction: {text_dir};">
-    {t['data_sources']}<br/><br/>
+<div style="font-size:12px;color:var(--text-dim);margin:0 4px;" class="{dir_cls}">
+    {t['data_sources']}<br><br>
     {t['pipeline_info']}
 </div>
 """, unsafe_allow_html=True)
 
-# ── Header ──
-st.markdown(f"<h1 style='direction: {text_dir};'>{t['main_title']}</h1>", unsafe_allow_html=True)
-st.markdown(f"<h5 style='direction: {text_dir}; color: #94a3b8;'>{t['subtitle']}</h5>", unsafe_allow_html=True)
-st.markdown("---")
+# ═══════════════════════════════════════════════════════════════
+# AUTO-REFRESH — browser reload every 120 s; cache TTL keeps
+# intermediate renders fresh without a full DB round-trip.
+# ═══════════════════════════════════════════════════════════════
+st.markdown(
+    '<meta http-equiv="refresh" content="120">',
+    unsafe_allow_html=True,
+)
 
-# ── Stats Row ──
-col1, col2, col3, col4, col5, col6 = st.columns(6)
+# ═══════════════════════════════════════════════════════════════
+# HEADER
+# ═══════════════════════════════════════════════════════════════
+st.markdown(
+    f"<h1 class='{dir_cls}'>🇮🇷 {t['main_title']}</h1>"
+    f"<p class='{dir_cls}' style='color:var(--text-muted);font-size:15px;margin-top:-8px;'>{t['subtitle']}</p>",
+    unsafe_allow_html=True,
+)
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
-# Only count CONFIRMED/PENDING as "active" — RESOLVED are separate
+# ═══════════════════════════════════════════════════════════════
+# HELPERS
+# ═══════════════════════════════════════════════════════════════
+
+def _class_for(value: str) -> str:
+    """Map a semantic colour name to a CSS gradient-text class."""
+    return {
+        "red": "text-red", "amber": "text-amber",
+        "emerald": "text-emerald", "slate": "text-slate",
+        "danger": "text-danger",
+    }.get(value, "text-slate")
+
+
+def render_stat_card(value, label: str, color: str, *, direction: str = "ltr", sub: str = ""):
+    """Render a single glass-card stat in the current column context."""
+    st.markdown(f"""
+    <div class="glass-card {direction}">
+        <div class="stat-card-label">{label}</div>
+        <div class="stat-card-value {_class_for(color)}">{value}</div>
+        {f'<div class="stat-card-sub">{sub}</div>' if sub else ''}
+    </div>
+    """, unsafe_allow_html=True)
+
+
+def render_warning_card(status: str, title: str, row: dict, direction: str):
+    """Render a warning/log card."""
+    bg_map = {
+        "CONFIRMED": ("rgba(239,68,68,0.07)", "rgba(239,68,68,0.22)"),
+        "PENDING":  ("rgba(245,158,11,0.07)", "rgba(245,158,11,0.22)"),
+        "FALSE_POSITIVE": ("rgba(100,116,139,0.07)", "rgba(100,116,139,0.2)"),
+        "RESOLVED": ("rgba(16,185,129,0.07)", "rgba(16,185,129,0.2)"),
+    }
+    bg, border = bg_map.get(status, ("rgba(100,116,139,0.07)", "rgba(100,116,139,0.2)"))
+
+    tm = row["acquisition_time"].strftime("%Y-%m-%d %H:%M UTC") if pd.notna(row.get("acquisition_time")) else "N/A"
+    risk = f"{row['risk_score']:.0f}/100" if pd.notna(row.get("risk_score")) else "N/A"
+    prov = row.get("province", "—")
+
+    st.markdown(f"""
+    <div class="warn-card {direction}" style="background:{bg};border:1px solid {border};">
+        <div class="warn-card-title">{title}</div>
+        <div class="warn-card-detail">
+            <b>{t['province']}:</b> {prov}<br>
+            <b>{t['coordinates']}:</b> {row['latitude']:.4f}, {row['longitude']:.4f}<br>
+            <b>{t['detection']}:</b> {tm}  ·  <b>{t['risk_score']}:</b> {risk}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+
+# ═══════════════════════════════════════════════════════════════
+# STAT ROW
+# ═══════════════════════════════════════════════════════════════
 active_confirmed = len(df[df["status"] == "CONFIRMED"]) if not df.empty else 0
-pending_fires = len(df[df["status"] == "PENDING"]) if not df.empty else 0
-false_positives = len(df[df["status"] == "FALSE_POSITIVE"]) if not df.empty else 0
-resolved_fires = len(df[df["status"] == "RESOLVED"]) if not df.empty else 0
+pending_fires   = len(df[df["status"] == "PENDING"])  if not df.empty else 0
+false_alarms    = len(df[df["status"] == "FALSE_POSITIVE"]) if not df.empty else 0
+resolved_fires  = len(df[df["status"] == "RESOLVED"]) if not df.empty else 0
 
-sirocco_regions = 0
-if not df.empty and "temp" in df.columns and "wind_speed" in df.columns:
+sirocco_count = 0
+if not df.empty and {"temp", "wind_speed", "humidity"}.issubset(df.columns):
     active_df = df[df["status"].isin(["CONFIRMED", "PENDING"])]
-    sirocco_regions = len(active_df[
-        (active_df["temp"] > 38) & 
-        (active_df["humidity"] < 25) &
-        (active_df["wind_speed"] > 20)
-    ]) if not active_df.empty else 0
+    if not active_df.empty:
+        sirocco_count = int(active_df[
+            (active_df["temp"] > 38) &
+            (active_df["humidity"] < 25) &
+            (active_df["wind_speed"] > 20)
+        ].shape[0])
 
-with col1:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_confirmed']}</div>
-        <div class="stat-value">{active_confirmed}</div>
-    </div>
-    """, unsafe_allow_html=True)
+cols = st.columns(6)
+with cols[0]: render_stat_card(active_confirmed, t["stat_confirmed"], "red", direction=dir_cls)
+with cols[1]: render_stat_card(pending_fires,   t["stat_pending"],   "amber", direction=dir_cls)
+with cols[2]: render_stat_card(false_alarms,    t["stat_false"],     "slate", direction=dir_cls)
+with cols[3]: render_stat_card(resolved_fires,  t["stat_resolved"],  "emerald", direction=dir_cls)
+with cols[4]: render_stat_card(sirocco_count,   t["stat_sirocco"],   "danger", direction=dir_cls)
+with cols[5]:
+    render_stat_card(
+        ACTIVE_VISITORS, t["active_visitors"], "emerald", direction=dir_cls,
+        sub=f"{TOTAL_VISITORS:,} {t['total_visitors']}",
+    )
 
-with col2:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_pending']}</div>
-        <div class="stat-value-green" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{pending_fires}</div>
-    </div>
-    """, unsafe_allow_html=True)
+# ═══════════════════════════════════════════════════════════════
+# MAP FILTERS
+# ═══════════════════════════════════════════════════════════════
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
-with col3:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_false']}</div>
-        <div class="stat-value-gray">{false_positives}</div>
-    </div>
-    """, unsafe_allow_html=True)
+STATUS_MAP = {
+    "CONFIRMED":       ("🔴", t["fire_confirmed"]),
+    "PENDING":         ("🟡", t["thermal_pending"]),
+    "FALSE_POSITIVE":  ("⚪", t["false_alarm"]),
+    "RESOLVED":        ("🟢", t["resolved_fire"]),
+}
+STATUS_LABEL_TO_KEY = {v[1]: k for k, (ico, v) in STATUS_MAP.items()}
 
-with col4:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_resolved']}</div>
-        <div class="stat-value-green">{resolved_fires}</div>
-    </div>
-    """, unsafe_allow_html=True)
+f1, f2, f3 = st.columns([2, 2, 1])
 
-with col5:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_sirocco']}</div>
-        <div class="stat-value" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{sirocco_regions}</div>
-    </div>
-    """, unsafe_allow_html=True)
+with f1:
+    selected_labels = st.multiselect(
+        t["filter_status"],
+        options=[v[1] for v in STATUS_MAP.values()],
+        default=[STATUS_MAP["CONFIRMED"][1], STATUS_MAP["PENDING"][1]],
+        key="map_status",
+    )
+    status_filter = [STATUS_LABEL_TO_KEY[lb] for lb in selected_labels if lb in STATUS_LABEL_TO_KEY]
 
-with col6:
-    st.markdown(f"""
-    <div class="glass-card" style="direction: {text_dir};">
-        <div class="stat-title">{t['stat_active_visitors']}</div>
-        <div class="stat-value-green" style="background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">{active_visitors}</div>
-        <div style="font-size: 11px; color: #64748b; margin-top: 2px;">{total_visitors:,} {t['stat_visitors']}</div>
-    </div>
-    """, unsafe_allow_html=True)
+with f2:
+    available_provinces = sorted(df["province"].dropna().unique().tolist()) if not df.empty and "province" in df.columns else []
+    province_filter = st.multiselect(
+        t["filter_province"], options=available_provinces,
+        default=[], key="map_province", placeholder=t["filter_all"],
+    )
 
-# ── Citizen Crowdsource Verification Form (Top Placement) ──
-st.markdown("---")
-st.subheader("📢 Ground Verification & Citizen Fire Report / گزارش میدانی آتش‌سوزی")
-st.markdown("<p style='color: #94a3b8; font-size: 14px;'>Report an active fire or confirm a satellite detection. Photo proof is mandatory for verification.</p>", unsafe_allow_html=True)
+with f3:
+    min_frp = st.slider(t["filter_frp"], 0.0, 300.0, 0.0, 10.0, key="map_frp")
 
-with st.expander("📝 Submit Ground Verification Report / ثبت گزارش میدانی", expanded=True):
-    cform_col1, cform_col2 = st.columns(2)
-    
-    with cform_col1:
+# Apply filters
+if not df.empty:
+    df_map = df[df["status"].isin(status_filter)]
+    df_map = df_map[df_map["frp"] >= min_frp]
+    if province_filter:
+        df_map = df_map[df_map["province"].isin(province_filter)]
+else:
+    df_map = pd.DataFrame()
+
+# ═══════════════════════════════════════════════════════════════
+# MAP
+# ═══════════════════════════════════════════════════════════════
+if df_map.empty:
+    map_center = [32.0, 53.5]
+    zoom_start = 6
+else:
+    latest = df_map.sort_values("acquisition_time", ascending=False).iloc[0]
+    if pd.notna(latest["latitude"]) and pd.notna(latest["longitude"]):
+        map_center = [float(latest["latitude"]), float(latest["longitude"])]
+        zoom_start = 10
+    else:
+        map_center = [32.0, 53.5]
+        zoom_start = 6
+
+m = folium.Map(
+    location=map_center, zoom_start=zoom_start,
+    tiles="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+    attr='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+)
+
+# Forest boundary overlay
+if GEOJSON_PATH.exists():
+    try:
+        geo = json.loads(GEOJSON_PATH.read_text())
+        folium.GeoJson(
+            geo,
+            name="Forest Hazard Zone",
+            style_function=lambda _: {
+                "fillColor": "#10b981", "color": "#059669",
+                "weight": 2, "fillOpacity": 0.06,
+            },
+        ).add_to(m)
+    except Exception:
+        pass
+
+# Plot markers
+COLOR_MAP = {
+    "CONFIRMED":       ("#ef4444", t["fire_confirmed"]),
+    "PENDING":         ("#f59e0b", t["thermal_pending"]),
+    "FALSE_POSITIVE":  ("#64748b", t["false_alarm"]),
+    "RESOLVED":        ("#10b981", t["resolved_fire"]),
+}
+
+for _, row in df_map.iterrows():
+    if pd.isna(row["latitude"]) or pd.isna(row["longitude"]):
+        continue
+
+    color, status_label = COLOR_MAP.get(row["status"], ("#64748b", row["status"]))
+    tm = row["acquisition_time"].strftime("%Y-%m-%d %H:%M UTC") if pd.notna(row["acquisition_time"]) else "N/A"
+    prov = row.get("province", "—")
+    temp_s = f"{row['temp']:.1f} °C" if pd.notna(row.get("temp")) else "—"
+    hum_s  = f"{row['humidity']:.1f}%"  if pd.notna(row.get("humidity")) else "—"
+    wind_s = f"{row['wind_speed']:.1f} km/h" if pd.notna(row.get("wind_speed")) else "—"
+    risk_s = f"{row['risk_score']:.0f}/100" if pd.notna(row.get("risk_score")) else "—"
+
+    # Build popup
+    popup = f"""
+    <div style="font-family:'Outfit','Vazirmatn',sans-serif;width:220px;color:#1e293b;">
+        <h4 style="margin:0 0 4px;color:#b91c1c;">{status_label}</h4>
+        <hr style="margin:4px 0;border:0;border-top:1px solid #cbd5e1;">
+        <b>{t['province']}:</b> {prov}<br>
+        <b>{t['coordinates']}:</b> {row['latitude']:.4f}, {row['longitude']:.4f}<br>
+        <b>{t['frp']}:</b> {row['frp']:.1f} MW<br>
+        <b>{t['confidence']}:</b> {row['confidence']}%<br>
+        <b>{t['time']}:</b> {tm}<br>
+        <hr style="margin:4px 0;border:0;border-top:1px dashed #cbd5e1;">
+        {t['temp']}: {temp_s}  ·  {t['humidity']}: {hum_s}<br>
+        {t['wind']}: {wind_s}  ·  {t['risk']}: {risk_s}
+    """
+
+    # Quicklook image
+    if "quicklook_url" in row and pd.notna(row.get("quicklook_url")) and row["quicklook_url"]:
+        ql = str(row["quicklook_url"])
+        img_uri = None
+        if not ql.startswith("http"):
+            lp = Path(ql)
+            if lp.exists():
+                try:
+                    b64 = base64.b64encode(lp.read_bytes()).decode()
+                    ext = lp.suffix.lower().lstrip(".")
+                    mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, "image/png")
+                    img_uri = f"data:{mime};base64,{b64}"
+                except Exception:
+                    pass
+        else:
+            img_uri = ql
+        if img_uri:
+            popup += f"""
+            <hr style="margin:4px 0;border:0;border-top:1px solid #cbd5e1;">
+            <b>{t['sentinel_quicklook']}:</b><br>
+            <img src="{img_uri}" style="width:100%;border-radius:6px;margin-top:4px;border:1px solid #94a3b8;">
+            """
+
+    popup += "</div>"
+    clean = popup.replace("\n", "").replace("'", "&#39;")
+
+    radius = 8 if row["status"] == "CONFIRMED" else (5 if row["status"] == "RESOLVED" else 6)
+    opacity = 0.35 if row["status"] == "RESOLVED" else 0.65
+
+    folium.CircleMarker(
+        location=[float(row["latitude"]), float(row["longitude"])],
+        radius=radius,
+        color=color, fill=True, fill_color=color,
+        fill_opacity=opacity,
+        popup=folium.Popup(clean, max_width=260),
+    ).add_to(m)
+
+map_html = m._repr_html_()  # type: ignore[attr-defined]
+components.html(map_html, height=620, scrolling=False)
+
+# ═══════════════════════════════════════════════════════════════
+# WARNINGS
+# ═══════════════════════════════════════════════════════════════
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+w1, w2, w3 = st.columns([2, 2, 2])
+with w1:
+    st.markdown(f"<h3 class='{dir_cls}'>{t['warnings_title']}</h3>", unsafe_allow_html=True)
+with w2:
+    if not df_map.empty and "acquisition_time" in df_map.columns:
+        min_d = df_map["acquisition_time"].min().date()
+        max_d = df_map["acquisition_time"].max().date()
+        date_range = st.date_input(t["date_range"], value=(min_d, max_d),
+                                   min_value=min_d, max_value=max_d, key="warn_date")
+    else:
+        date_range = None
+with w3:
+    warn_provinces = sorted(df_map["province"].dropna().unique().tolist()) if not df_map.empty and "province" in df_map.columns else []
+    warn_province_sel = st.multiselect(
+        t["filter_province"], options=warn_provinces,
+        default=[], key="warn_province", placeholder=t["filter_all"],
+    )
+
+df_w = df_map.copy()
+
+if not df_w.empty and date_range and len(date_range) == 2:
+    start = pd.Timestamp.combine(date_range[0], dt_time.min).tz_localize("UTC")
+    end   = pd.Timestamp.combine(date_range[1], dt_time.max).tz_localize("UTC")
+    df_w = df_w[(df_w["acquisition_time"] >= start) & (df_w["acquisition_time"] <= end)]
+
+if not df_w.empty and warn_province_sel:
+    df_w = df_w[df_w["province"].isin(warn_province_sel)]
+
+if df_w.empty:
+    st.info(t["no_data"], icon="ℹ️")
+else:
+    df_w = df_w.sort_values("acquisition_time", ascending=False)
+    warn_cols = st.columns(2)
+    for i, (_, row) in enumerate(df_w.iterrows()):
+        status = row["status"]
+        icon = STATUS_MAP.get(status, ("", ""))[0]
+        lbl = STATUS_MAP.get(status, ("", status))[1]
+        title = f"{icon} {lbl}"
+        if status == "CONFIRMED":
+            title += f" — FRP {row['frp']:.1f} MW"
+        with warn_cols[i % 2]:
+            render_warning_card(status, title, row, dir_cls)
+
+# ═══════════════════════════════════════════════════════════════
+# CITIZEN VERIFICATION FORM
+# ═══════════════════════════════════════════════════════════════
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+st.markdown(f"<h3 class='{dir_cls}'>📢 {t['verification_title']}</h3>", unsafe_allow_html=True)
+st.markdown(
+    f"<p class='{dir_cls}' style='color:var(--text-muted);font-size:14px;margin-top:-4px;'>{t['verification_subtitle']}</p>",
+    unsafe_allow_html=True,
+)
+
+with st.expander("📝 " + t["submit_report"], expanded=False):
+    c1, c2 = st.columns(2)
+    reporter_label_map = {
+        t["citizen"]:   "Citizen",
+        t["ranger"]:    "Ranger",
+        t["fire_dept"]: "Fire Department",
+    }
+    severity_label_map = {
+        t["severity_smoke"]:   "Active Smoke Plume",
+        t["severity_flames"]:  "Visible Flames Spreading",
+        t["severity_ext"]:     "Extinguished",
+    }
+
+    with c1:
         reporter_type = st.selectbox(
-            "Reporter Category / نوع گزارش‌دهنده",
-            ["Local Citizen / شهروند", "Forest Ranger / محیط‌بان", "Fire Department / آتش‌نشانی"],
-            key="cit_reporter_type"
+            t["reporter_label"],
+            list(reporter_label_map.keys()),
+            key="cit_reporter_type",
         )
-        reporter_name = st.text_input("Reporter Name / نام گزارش‌دهنده (Optional)", value="", key="cit_reporter_name")
+        reporter_name = st.text_input(t["reporter_name"], key="cit_reporter_name")
         severity = st.selectbox(
-            "Fire Severity / شدت آتش‌سوزی",
-            ["Active Smoke Plume / دود فعال", "Visible Flames Spreading / شعله‌های قابل مشاهده", "Extinguished / خاموش شده"],
-            key="cit_severity"
+            t["severity_label"],
+            list(severity_label_map.keys()),
+            key="cit_severity",
         )
 
-    with cform_col2:
+    with c2:
         loc_method = st.radio(
-            "Location Input Method / روش تعیین موقعیت",
-            ["GPS Auto-Detect / تشخیص خودکار", "Province & Manual Coordinates / انتخاب استان و مختصات"],
-            key="cit_loc_method"
+            t["loc_method"],
+            [t["gps_auto"], t["manual_coords"]],
+            key="cit_loc_method",
         )
-        
-        rep_lat = 36.5
-        rep_lon = 51.5
-        selected_wilaya_name = "Mazandaran / مازندران"
-        
-        if loc_method.startswith("GPS"):
-            st.markdown("📍 *GPS Auto-Detect Active:* Using browser geolocation or default station coordinates.")
+
+        if loc_method == t["gps_auto"]:
+            st.markdown(
+                f"<span style='font-size:13px;color:var(--emerald);' class='{dir_cls}'>📍 GPS Auto‑Detect Active</span>",
+                unsafe_allow_html=True,
+            )
             components.html("""
-            <div style="font-family: sans-serif; font-size: 12px; color: #10b981;">
-                <button onclick="getLocation()" style="background:#10b981; color:white; border:none; padding:6px 12px; border-radius:6px; cursor:pointer;">
-                    🎯 Auto-Fetch GPS Coordinates
+            <div style="font-family:system-ui,sans-serif;font-size:12px;color:var(--emerald);margin:4px 0 12px;">
+                <button onclick="getLocation()" style="background:#10b981;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;">
+                    🎯 Fetch GPS
                 </button>
-                <span id="gps_status" style="margin-left:10px; color:#94a3b8;">Click to obtain exact location</span>
+                <span id="gps_status" style="margin-left:10px;color:#94a3b8;">Click to detect location</span>
                 <script>
-                function getLocation() {
-                    var status = document.getElementById("gps_status");
-                    if (navigator.geolocation) {
-                        status.innerText = "Locating...";
-                        navigator.geolocation.getCurrentPosition(function(pos) {
-                            status.innerText = "GPS Lat: " + pos.coords.latitude.toFixed(4) + ", Lon: " + pos.coords.longitude.toFixed(4);
-                        }, function(err) {
-                            status.innerText = "Geolocation failed: " + err.message;
-                        });
-                    } else {
-                        status.innerText = "Geolocation not supported.";
-                    }
+                function getLocation(){
+                    var s=document.getElementById("gps_status");
+                    if(navigator.geolocation){s.innerText="Locating…";navigator.geolocation.getCurrentPosition(function(p){s.innerText="Lat: "+p.coords.latitude.toFixed(5)+", Lon: "+p.coords.longitude.toFixed(5);},function(e){s.innerText="Error: "+e.message;});}
+                    else{s.innerText="Geolocation not supported.";}
                 }
                 </script>
-            </div>
-            """, height=45)
-            rep_lat = st.number_input("Latitude / عرض جغرافیایی", value=36.7120, format="%.4f", key="cit_gps_lat")
-            rep_lon = st.number_input("Longitude / طول جغرافیایی", value=51.4200, format="%.4f", key="cit_gps_lon")
+            </div>""", height=55)
+            rep_lat = st.number_input("Latitude", value=36.7120, format="%.4f", key="cit_gps_lat")
+            rep_lon = st.number_input("Longitude", value=51.4200, format="%.4f", key="cit_gps_lon")
+            selected_province_name = "Mazandaran / مازندران"
         else:
-            all_wilaya_keys = list(WILAYA_BOUNDS.keys())
-            selected_wilaya_name = st.selectbox("Select Province / انتخاب استان", options=all_wilaya_keys, key="cit_wilaya_select")
-            bounds = WILAYA_BOUNDS[selected_wilaya_name]
-            default_lat = (bounds["lat"][0] + bounds["lat"][1]) / 2.0
-            default_lon = (bounds["lon"][0] + bounds["lon"][1]) / 2.0
-            rep_lat = st.number_input("Latitude / عرض جغرافیایی", value=default_lat, format="%.4f", key="cit_man_lat")
-            rep_lon = st.number_input("Longitude / طول جغرافیایی", value=default_lon, format="%.4f", key="cit_man_lon")
+            selected_province_name = st.selectbox(
+                t["filter_province"],
+                list(PROVINCE_BOUNDS.keys()),
+                key="cit_province_select",
+            )
+            bounds = PROVINCE_BOUNDS[selected_province_name]
+            rep_lat = st.number_input(
+                "Latitude",
+                value=(bounds["lat"][0] + bounds["lat"][1]) / 2,
+                format="%.4f", key="cit_man_lat",
+            )
+            rep_lon = st.number_input(
+                "Longitude",
+                value=(bounds["lon"][0] + bounds["lon"][1]) / 2,
+                format="%.4f", key="cit_man_lon",
+            )
 
-    description = st.text_area("Description & Notes / توضیحات", placeholder="E.g., Smoke plume visible near forest boundary moving North...", key="cit_desc")
-    
-    st.markdown("---")
-    st.markdown("📷 **Mandatory Photo Proof / تصویر (الزامی)**")
-    
-    pcol1, pcol2 = st.columns(2)
-    with pcol1:
-        uploaded_file = st.file_uploader("Upload Photo File / بارگذاری تصویر", type=["jpg", "jpeg", "png"], key="cit_file")
-    with pcol2:
-        camera_file = st.camera_input("Take Snapshot with Camera / عکس با دوربین", key="cit_cam")
-        
+    description = st.text_area(
+        t["desc_label"],
+        placeholder="E.g. Smoke plume visible near forest boundary moving North…",
+        key="cit_desc",
+    )
+
+    st.markdown(f"**📷 {t['photos_required']}**")
+    pc1, pc2 = st.columns(2)
+    with pc1:
+        uploaded_file = st.file_uploader(t["upload_photo"], type=["jpg", "jpeg", "png"], key="cit_file")
+    with pc2:
+        camera_file = st.camera_input(t["take_snapshot"], key="cit_cam")
+
     final_photo = uploaded_file or camera_file
-    
-    if st.button("🚀 Submit Fire Report / ارسال گزارش", key="cit_submit_btn"):
+
+    if st.button("🚀 " + t["submit_report"], key="cit_submit_btn", use_container_width=True):
         if not final_photo:
-            st.error("⚠️ **OBLIGATORY FIELD MISSING:** You must upload a photo or take a camera snapshot to submit a ground verification report!")
+            st.error(t["report_err_photo"])
         else:
             try:
                 photo_bytes = final_photo.getvalue()
-                b64_photo = base64.b64encode(photo_bytes).decode("utf-8")
-                mime = "image/png" if final_photo.name.endswith(".png") else "image/jpeg"
-                photo_uri = f"data:{mime};base64,{b64_photo}"
-                
-                report_payload = {
+                b64_photo = base64.b64encode(photo_bytes).decode()
+                mime = "image/png" if getattr(final_photo, "name", "").endswith(".png") else "image/jpeg"
+
+                db_client = DbClient()
+                report_id = db_client.save_citizen_report({
                     "latitude": rep_lat,
                     "longitude": rep_lon,
-                    "reporter_type": reporter_type.split("/")[0].strip(),
-                    "reporter_name": reporter_name if reporter_name else "Anonymous",
-                    "wilaya": selected_wilaya_name,
-                    "severity": severity.split("/")[0].strip(),
+                    "reporter_type": reporter_label_map[reporter_type],
+                    "reporter_name": reporter_name or "Anonymous",
+                    "wilaya": selected_province_name,
+                    "severity": severity_label_map[severity],
                     "description": description,
-                    "photo_b64": photo_uri,
-                    "verified": True if "Ranger" in reporter_type or "Fire" in reporter_type else False
-                }
-                
-                report_id = db_client.save_citizen_report(report_payload)
-                st.success(f"✅ Fire report submitted successfully! Report ID: {report_id or 'SAVED'}. Thank you for helping protect Iranian forests.")
-            except Exception as e:
-                st.error(f"Failed to record report: {e}")
+                    "photo_b64": f"data:{mime};base64,{b64_photo}",
+                    "verified": reporter_label_map[reporter_type] in ("Ranger", "Fire Department"),
+                })
+                st.success(t["report_success"].format(id=report_id or "SAVED"))
+            except Exception as exc:
+                st.error(t["report_err_general"].format(err=exc))
 
-# ── Map Filters ──
-
-
-st.subheader(t["map_title"])
-
-fcol1, fcol2, fcol3 = st.columns([2, 2, 1])
-
-STATUS_DISPLAY = {
-    "CONFIRMED": "🔴 " + t["fire_confirmed"],
-    "PENDING": "🟡 " + t["thermal_pending"],
-    "FALSE_POSITIVE": "⚪ " + t["false_alarm"],
-    "RESOLVED": "🟢 " + t["resolved_fire"],
-}
-
-with fcol1:
-    status_options = list(STATUS_DISPLAY.keys())
-    status_labels = list(STATUS_DISPLAY.values())
-    selected_labels = st.multiselect(
-        t["filter_status"],
-        options=status_labels,
-        default=[STATUS_DISPLAY["CONFIRMED"], STATUS_DISPLAY["PENDING"]],
-        key="map_status"
-    )
-    # Map back to DB values
-    label_to_key = {v: k for k, v in STATUS_DISPLAY.items()}
-    status_filter = [label_to_key[l] for l in selected_labels if l in label_to_key]
-
-with fcol2:
-    available_wilayas = sorted(df["wilaya"].unique().tolist()) if not df.empty and "wilaya" in df.columns else []
-    wilaya_map_filter = st.multiselect(
-        t["filter_wilaya"],
-        options=available_wilayas,
-        default=[],
-        key="map_wilaya",
-        placeholder=t["all_wilayas"]
-    )
-
-with fcol3:
-    min_frp = st.slider(t["filter_frp"], 0.0, 300.0, 0.0, 10.0, key="map_frp")
-
-# Apply map filters
-if not df.empty:
-    df_filtered = df[df["status"].isin(status_filter)]
-    df_filtered = df_filtered[df_filtered["frp"] >= min_frp]
-    if wilaya_map_filter:
-        df_filtered = df_filtered[df_filtered["wilaya"].isin(wilaya_map_filter)]
-else:
-    df_filtered = pd.DataFrame()
-
-# ── Full-Width Map ──
-map_center = [32.0, 53.5]
-zoom_start = 6
-if not df_filtered.empty:
-    df_sorted = df_filtered.sort_values(by="acquisition_time", ascending=False)
-    latest_row = df_sorted.iloc[0]
-    if pd.notna(latest_row["latitude"]) and pd.notna(latest_row["longitude"]):
-        map_center = [float(latest_row["latitude"]), float(latest_row["longitude"])]
-        zoom_start = 9
-
-m = folium.Map(location=map_center, zoom_start=zoom_start, tiles="cartodbpositron")
-
-# Forest boundary GeoJSON overlay
-if GEOJSON_PATH.exists():
-    try:
-        with open(GEOJSON_PATH, "r") as f:
-            geojson_data = json.load(f)
-        folium.GeoJson(
-            geojson_data,
-            name="Iran Forest Hazard Risk Zone",
-            style_function=lambda x: {
-                "fillColor": "#10b981", "color": "#059669",
-                "weight": 2, "fillOpacity": 0.05
-            }
-        ).add_to(m)
-    except Exception as e:
-        st.error(f"Error drawing boundary: {e}")
-
-# Plot fire markers
-STATUS_COLORS = {
-    "CONFIRMED": ("#ef4444", t["confirmed_fire_lbl"]),
-    "PENDING": ("#f59e0b", t["pending_lbl"]),
-    "FALSE_POSITIVE": ("#64748b", t["false_positive_lbl"]),
-    "RESOLVED": ("#10b981", t["resolved_lbl"]),
-}
-
-if not df_filtered.empty:
-    for idx, row in df_filtered.iterrows():
-        color, status_lbl = STATUS_COLORS.get(row["status"], ("#64748b", row["status"]))
-
-        formatted_time = row["acquisition_time"].strftime("%Y-%m-%d %H:%M UTC") if pd.notna(row["acquisition_time"]) else "N/A"
-        wilaya_name = row.get("wilaya", "Unknown")
-
-        popup_html = f"""
-        <div style="font-family: 'Outfit', 'Vazirmatn', sans-serif; width: 230px; color:#1e293b;">
-            <h4 style="margin: 0 0 6px 0; color:#b91c1c;">{status_lbl}</h4>
-            <hr style="margin: 4px 0 6px 0; border: 0; border-top:1px solid #cbd5e1;"/>
-            <b>{t['wilaya']}:</b> {wilaya_name}<br/>
-            <b>{t['coordinates']}:</b> {row['latitude']:.4f}, {row['longitude']:.4f}<br/>
-            <b>{t['frp']}:</b> {row['frp']:.1f} MW<br/>
-            <b>{t['confidence']}:</b> {row['confidence']}%<br/>
-            <b>{t['time']}:</b> {formatted_time}<br/>
-        """
-
-        temp_str = f"{row['temp']:.1f} C" if pd.notna(row.get('temp')) else "N/A"
-        humidity_str = f"{row['humidity']:.1f}%" if pd.notna(row.get('humidity')) else "N/A"
-        wind_str = f"{row['wind_speed']:.1f} km/h" if pd.notna(row.get('wind_speed')) else "N/A"
-        risk_str = f"{row['risk_score']:.0f}/100" if pd.notna(row.get('risk_score')) else "N/A"
-
-        if temp_str != "N/A" or humidity_str != "N/A" or wind_str != "N/A":
-            popup_html += f"""
-            <hr style="margin: 6px 0 6px 0; border: 0; border-top:1px dashed #cbd5e1;"/>
-            <b>{t['temp']}:</b> {temp_str}<br/>
-            <b>{t['humidity']}:</b> {humidity_str}<br/>
-            <b>{t['wind']}:</b> {wind_str}<br/>
-            <b>{t['risk']}:</b> {risk_str}<br/>
-            """
-
-        # Quicklook image
-        if "quicklook_url" in row and pd.notna(row["quicklook_url"]) and row["quicklook_url"] is not None:
-            quicklook_path = str(row["quicklook_url"])
-            img_data_uri = None
-            if not quicklook_path.startswith("http"):
-                local_path = Path(quicklook_path)
-                if local_path.exists():
-                    try:
-                        with open(local_path, "rb") as img_file:
-                            b64 = base64.b64encode(img_file.read()).decode("utf-8")
-                            ext = local_path.suffix.lower().lstrip(".")
-                            mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, "image/png")
-                            img_data_uri = f"data:{mime};base64,{b64}"
-                    except Exception:
-                        pass
-            else:
-                img_data_uri = quicklook_path
-            if img_data_uri:
-                popup_html += f"""
-                <hr style="margin: 6px 0 6px 0; border: 0; border-top:1px solid #cbd5e1;"/>
-                <b>{t['sentinel_quicklook']}:</b><br/>
-                <img src="{img_data_uri}" style="width:100%; border-radius:6px; margin-top:4px; border:1px solid #94a3b8;"/>
-                """
-
-        popup_html += "</div>"
-        clean_popup_html = popup_html.replace("\n", "").replace("\r", "").replace("'", "&#39;")
-
-        if pd.isna(row["latitude"]) or pd.isna(row["longitude"]):
-            continue
-
-        marker_radius = 8 if row["status"] == "CONFIRMED" else (5 if row["status"] == "RESOLVED" else 6)
-        marker_opacity = 0.35 if row["status"] == "RESOLVED" else 0.6
-
-        folium.CircleMarker(
-            location=[float(row["latitude"]), float(row["longitude"])],
-            radius=marker_radius,
-            color=color, fill=True, fill_color=color,
-            fill_opacity=marker_opacity,
-            popup=folium.Popup(clean_popup_html, max_width=260)
-        ).add_to(m)
-
-# Render map
-map_html = m._repr_html_()
-map_html = re.sub(r'(?<!\\)\\([0-9])', r'\\\\\1', map_html)
-components.html(map_html, height=700, scrolling=False)
-
-# ── Real-Time Warnings ──
-st.markdown("---")
-
-wcol_header, wcol_date, wcol_wilaya = st.columns([2, 2, 2])
-
-with wcol_header:
-    st.subheader(t["warnings_title"])
-
-with wcol_date:
-    if not df_filtered.empty and "acquisition_time" in df_filtered.columns:
-        min_date = df_filtered["acquisition_time"].min().date()
-        max_date = df_filtered["acquisition_time"].max().date()
-        date_range = st.date_input(
-            t["filter_date"], value=(min_date, max_date),
-            min_value=min_date, max_value=max_date, key="warn_date"
-        )
-    else:
-        date_range = None
-
-with wcol_wilaya:
-    warn_wilayas = sorted(df_filtered["wilaya"].unique().tolist()) if not df_filtered.empty and "wilaya" in df_filtered.columns else []
-    warn_wilaya_sel = st.multiselect(
-        t["filter_by_wilaya"], options=warn_wilayas,
-        default=[], key="warn_wilaya", placeholder=t["all_wilayas"]
-    )
-
-df_warnings = df_filtered.copy() if not df_filtered.empty else pd.DataFrame()
-
-if not df_warnings.empty and date_range and len(date_range) == 2:
-    from datetime import time as dt_time
-    start_dt = pd.Timestamp.combine(date_range[0], dt_time.min).tz_localize("UTC")
-    end_dt = pd.Timestamp.combine(date_range[1], dt_time.max).tz_localize("UTC")
-    df_warnings = df_warnings[
-        (df_warnings["acquisition_time"] >= start_dt) &
-        (df_warnings["acquisition_time"] <= end_dt)
-    ]
-
-if not df_warnings.empty and warn_wilaya_sel:
-    df_warnings = df_warnings[df_warnings["wilaya"].isin(warn_wilaya_sel)]
-
-# Warning cards
-CARD_STYLES = {
-    "CONFIRMED": ("rgba(239, 68, 68, 0.08)", "rgba(239, 68, 68, 0.25)", "🔴 " + t["fire_confirmed"]),
-    "PENDING": ("rgba(245, 158, 11, 0.08)", "rgba(245, 158, 11, 0.25)", "🟡 " + t["thermal_pending"]),
-    "FALSE_POSITIVE": ("rgba(100, 116, 139, 0.08)", "rgba(100, 116, 139, 0.25)", "⚪ " + t["false_alarm"]),
-    "RESOLVED": ("rgba(16, 185, 129, 0.08)", "rgba(16, 185, 129, 0.25)", "🟢 " + t["resolved_fire"]),
-}
-
-if df_warnings.empty:
-    st.info(t["no_fires"])
-else:
-    df_display = df_warnings.sort_values(by="acquisition_time", ascending=False)
-    warn_cols = st.columns(2)
-
-    for card_idx, (idx, row) in enumerate(df_display.iterrows()):
-        bg_color, border_color, title_base = CARD_STYLES.get(
-            row["status"], ("rgba(100,116,139,0.08)", "rgba(100,116,139,0.25)", row["status"])
-        )
-        if row["status"] == "CONFIRMED":
-            title = f"{title_base} - FRP {row['frp']:.1f} MW"
-        else:
-            title = title_base
-
-        formatted_time = row["acquisition_time"].strftime("%Y-%m-%d %H:%M UTC") if pd.notna(row["acquisition_time"]) else "N/A"
-        risk_val = f"{row['risk_score']:.0f}/100" if pd.notna(row.get('risk_score')) else "N/A"
-        wilaya_name = row.get("wilaya", "Unknown")
-
-        with warn_cols[card_idx % 2]:
-            st.markdown(f"""
-            <div style="background-color: {bg_color}; border: 1px solid {border_color}; border-radius: 12px; padding: 14px; margin-bottom: 12px; direction: {text_dir};">
-                <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">{title}</div>
-                <div style="font-size: 13px; color: #94a3b8;">
-                    <b>{t['wilaya']}:</b> {wilaya_name}<br/>
-                    <b>{t['coordinates']}:</b> {row['latitude']:.4f}, {row['longitude']:.4f}<br/>
-                    <b>{t['detection']}:</b> {formatted_time}<br/>
-                    <b>{t['risk_score']}:</b> {risk_val}
-            </div>
-            """, unsafe_allow_html=True)
-
-# Footer
-st.markdown("---")
+# ═══════════════════════════════════════════════════════════════
+# FOOTER
+# ═══════════════════════════════════════════════════════════════
+st.markdown('<hr class="divider">', unsafe_allow_html=True)
 st.markdown(
-    f"<p style='text-align: center; color: #64748b; font-size: 12px; direction: {text_dir};'>"
-    f"{t['footer']}"
-    "</p>",
-    unsafe_allow_html=True
+    f"<p class='footer {dir_cls}'>🔥 {t['footer']}</p>",
+    unsafe_allow_html=True,
 )
-
-
