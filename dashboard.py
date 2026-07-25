@@ -20,6 +20,7 @@ import streamlit.components.v1 as components
 from src.config import GEOJSON_PATH
 from src.db_client import DbClient
 from src.spatial_filter import SpatialFilter
+from src.flare_filter import FlareFilter
 
 # ═══════════════════════════════════════════════════════════════
 # PAGE CONFIG
@@ -426,6 +427,17 @@ def load_fires() -> tuple[pd.DataFrame, bool]:
     spatial = SpatialFilter()
     fires = [f for f in fires if spatial.is_in_forest_zone(
         float(f.get("latitude", 0)), float(f.get("longitude", 0)))]
+
+    # Flare exclusion filter
+    flare_filter = FlareFilter()
+    if flare_filter.active:
+        before = len(fires)
+        fires = [f for f in fires if not flare_filter.is_excluded(
+            float(f.get("latitude", 0)), float(f.get("longitude", 0)))]
+        excluded = before - len(fires)
+        logging.getLogger("dashboard").info(
+            f"Flare filter removed {excluded} fire(s) from dashboard display."
+        )
 
     df = pd.DataFrame(fires)
     if not df.empty and "acquisition_time" in df.columns:
