@@ -1,7 +1,7 @@
 import math
 import pytest
 from datetime import datetime, timezone, timedelta
-from src.spatial_filter import SpatialFilter
+from src.spatial_filter import SpatialFilter, GEOPANDAS_AVAILABLE
 from src.weather_client import WeatherClient
 from src.social_verifier import SocialVerifier
 from src.telegram_notifier import TelegramNotifier
@@ -29,6 +29,39 @@ def test_spatial_filter_invalid_coordinates():
 def test_spatial_filter_valid_string_coercion():
     sf = SpatialFilter()
     assert sf.is_in_forest_zone("24.0", "53.0") is False
+
+
+def test_spatial_filter_inside_forest_zone():
+    """Verify that a point inside the forest zone polygon returns True."""
+    sf = SpatialFilter()
+    if GEOPANDAS_AVAILABLE:
+        assert sf.is_in_forest_zone(36.0, 53.0) is True
+
+
+def test_spatial_filter_outside_forest_zone():
+    """Verify that a point outside the polygon but within the fallback bbox returns False."""
+    sf = SpatialFilter()
+    if GEOPANDAS_AVAILABLE:
+        assert sf.is_in_forest_zone(38.0, 51.0) is False
+
+
+def test_spatial_filter_extreme_south():
+    """Verify that a point far south (below 25N hard gate) returns False."""
+    sf = SpatialFilter()
+    assert sf.is_in_forest_zone(24.0, 55.0) is False
+
+
+def test_spatial_filter_far_west():
+    """Verify that a point west of the polygon (Iraq) returns False."""
+    sf = SpatialFilter()
+    assert sf.is_in_forest_zone(33.0, 43.0) is False
+
+
+def test_spatial_filter_tehran():
+    """Verify that Tehran (~35.689, 51.389) is inside the forest zone."""
+    sf = SpatialFilter()
+    if GEOPANDAS_AVAILABLE:
+        assert sf.is_in_forest_zone(35.689, 51.389) is True
 
 def test_fire_risk_calculations():
     wc = WeatherClient()
