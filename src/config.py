@@ -60,6 +60,9 @@ DATABASE_URL = get_secret("DATABASE_URL", "")
 # Path to the geojson boundary file
 GEOJSON_PATH = BASE_DIR / "iran_forest_zone.geojson"
 
+# Path to the known flare exclusion zones file
+FLARE_EXCLUSION_PATH = BASE_DIR / "flare_exclusion_zones.json"
+
 def validate_config(check_db=True, check_copernicus=True):
     """Validates that crucial environment variables are loaded."""
     missing = []

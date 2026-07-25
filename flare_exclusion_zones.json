@@ -1,0 +1,30 @@
+{
+  "exclusion_radius_km": 5.0,
+  "flares": [
+    {"name": "Flare 01", "latitude": 33.696381, "longitude": 46.228394},
+    {"name": "Flare 02", "latitude": 32.597308, "longitude": 47.544005},
+    {"name": "Flare 03", "latitude": 32.490525, "longitude": 47.210474},
+    {"name": "Flare 04", "latitude": 32.352446, "longitude": 47.707439},
+    {"name": "Flare 05", "latitude": 32.255691, "longitude": 47.252635},
+    {"name": "Flare 06", "latitude": 32.107577, "longitude": 47.549339},
+    {"name": "Flare 07", "latitude": 31.320706, "longitude": 49.281731},
+    {"name": "Flare 08", "latitude": 31.272240, "longitude": 48.116624},
+    {"name": "Flare 09", "latitude": 31.209280, "longitude": 48.952716},
+    {"name": "Flare 10", "latitude": 31.082415, "longitude": 47.627437},
+    {"name": "Flare 11", "latitude": 31.041606, "longitude": 49.392518},
+    {"name": "Flare 12", "latitude": 31.030997, "longitude": 47.283687},
+    {"name": "Flare 13", "latitude": 31.027570, "longitude": 47.705238},
+    {"name": "Flare 14", "latitude": 31.003798, "longitude": 48.139630},
+    {"name": "Flare 15", "latitude": 30.882003, "longitude": 47.331939},
+    {"name": "Flare 16", "latitude": 30.826290, "longitude": 47.329667},
+    {"name": "Flare 17", "latitude": 30.751782, "longitude": 48.280372},
+    {"name": "Flare 18", "latitude": 30.609801, "longitude": 47.327422},
+    {"name": "Flare 19", "latitude": 30.561906, "longitude": 47.329187},
+    {"name": "Flare 20", "latitude": 27.684069, "longitude": 52.248572},
+    {"name": "Flare 21", "latitude": 35.487009, "longitude": 44.154742},
+    {"name": "Flare 22", "latitude": 35.246684, "longitude": 44.431124},
+    {"name": "Flare 23", "latitude": 38.648115, "longitude": 54.282652},
+    {"name": "Flare 24", "latitude": 35.628928, "longitude": 44.008875},
+    {"name": "Flare 25", "latitude": 35.486934, "longitude": 44.154590}
+  ]
+}

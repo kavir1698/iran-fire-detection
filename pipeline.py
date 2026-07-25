@@ -16,6 +16,7 @@ from math import radians, sin, cos, sqrt, atan2
 from src.config import validate_config
 from src.firms_client import FirmsClient
 from src.spatial_filter import SpatialFilter
+from src.flare_filter import FlareFilter
 from src.weather_client import WeatherClient
 from src.copernicus_client import CopernicusClient
 from src.smoke_detector import SmokeDetector
@@ -292,6 +293,7 @@ def run_pipeline():
         # 2. Initialize Clients
         firms = FirmsClient()
         spatial = SpatialFilter()
+        flare_filter = FlareFilter()
         weather = WeatherClient()
         copernicus = CopernicusClient()
         detector = SmokeDetector()
@@ -328,11 +330,19 @@ def run_pipeline():
 
         # First round filter: keep only hotspots inside the Northern Forest Hazard zone
         forest_hotspots = []
+        excluded_by_flare = 0
         for idx, row in df.iterrows():
             lat = float(row.get("latitude", 0.0))
             lon = float(row.get("longitude", 0.0))
-            if spatial.is_in_forest_zone(lat, lon):
-                forest_hotspots.append(row.to_dict())
+            if not spatial.is_in_forest_zone(lat, lon):
+                continue
+            if flare_filter.is_excluded(lat, lon):
+                excluded_by_flare += 1
+                continue
+            forest_hotspots.append(row.to_dict())
+
+        if flare_filter.active:
+            logger.info(f"Flare filter active: {excluded_by_flare} hotspot(s) excluded within {flare_filter.exclusion_radius_km:.0f} km of {flare_filter.flare_count} known flare(s).")
 
         if not forest_hotspots:
             logger.info("No active thermal hotspots found inside the forest hazard zones. Pipeline finished.")

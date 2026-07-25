@@ -1,10 +1,14 @@
 import math
+import json
+import tempfile
 import pytest
+from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from src.spatial_filter import SpatialFilter, GEOPANDAS_AVAILABLE
 from src.weather_client import WeatherClient
 from src.social_verifier import SocialVerifier
 from src.telegram_notifier import TelegramNotifier
+from src.flare_filter import FlareFilter
 from pipeline import compute_composite_score, parse_firms_time, parse_confidence, cluster_hotspots
 
 def test_spatial_filter_invalid_coordinates():
@@ -149,4 +153,74 @@ def test_dbscan_clustering():
     clusters = cluster_hotspots(hotspots)
     assert clusters[0][0] == clusters[1][0]  # Same cluster
     assert clusters[2][0] == -1  # Noise
+
+
+class TestFlareFilter:
+    @pytest.fixture
+    def sample_exclusion_file(self):
+        data = {
+            "exclusion_radius_km": 5.0,
+            "flares": [
+                {"name": "South Pars Gas Field", "latitude": 27.5, "longitude": 52.0},
+                {"name": "Abadan Refinery", "latitude": 30.35, "longitude": 48.28},
+            ]
+        }
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump(data, f)
+            path = f.name
+        yield Path(path)
+        Path(path).unlink(missing_ok=True)
+
+    def test_flare_filter_loads_and_excludes(self, sample_exclusion_file):
+        ff = FlareFilter(exclusion_path=sample_exclusion_file)
+        assert ff.active
+        assert ff.exclusion_radius_km == 5.0
+        assert ff.flare_count == 2
+
+        assert ff.is_excluded(27.51, 52.01) is True
+        assert ff.is_excluded(27.46, 52.02) is True
+
+        assert ff.is_excluded(27.5, 52.1) is False
+        assert ff.is_excluded(35.0, 51.0) is False
+
+    def test_flare_filter_invalid_inputs(self, sample_exclusion_file):
+        ff = FlareFilter(exclusion_path=sample_exclusion_file)
+        assert ff.is_excluded(None, 52.0) is False
+        assert ff.is_excluded(27.5, None) is False
+        assert ff.is_excluded("invalid", 52.0) is False
+
+    def test_flare_filter_empty_file(self):
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump({"exclusion_radius_km": 5.0, "flares": []}, f)
+            path = f.name
+        try:
+            ff = FlareFilter(exclusion_path=Path(path))
+            assert not ff.active
+            assert ff.flare_count == 0
+            assert ff.is_excluded(27.5, 52.0) is False
+        finally:
+            Path(path).unlink(missing_ok=True)
+
+    def test_flare_filter_missing_file(self):
+        ff = FlareFilter(exclusion_path=Path("/nonexistent/flare_zones.json"))
+        assert not ff.active
+        assert ff.is_excluded(27.5, 52.0) is False
+
+    def test_flare_filter_malformed_entry_skipped(self):
+        data = {"exclusion_radius_km": 3.0, "flares": [
+            {"name": "Good", "latitude": 31.0, "longitude": 49.0},
+            {"name": "Bad", "longitude": 48.0},
+            {"name": "Also Good", "latitude": 35.0, "longitude": 44.0},
+        ]}
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, encoding="utf-8") as f:
+            json.dump(data, f)
+            path = f.name
+        try:
+            ff = FlareFilter(exclusion_path=Path(path))
+            assert ff.active
+            assert ff.flare_count == 2
+            assert ff.is_excluded(31.01, 49.01) is True
+            assert ff.is_excluded(31.0, 49.1) is False
+        finally:
+            Path(path).unlink(missing_ok=True)
 
