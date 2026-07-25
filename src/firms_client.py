@@ -2,6 +2,8 @@ import io
 import logging
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from src.config import NASA_FIRMS_KEY
 
 logger = logging.getLogger("firms_client")
@@ -19,6 +21,16 @@ class FirmsClient:
             "east": 63.3,
             "north": 39.8
         }
+        # Create a session with retry logic for resilient API calls
+        self.session = requests.Session()
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        self.session.mount("https://", adapter)
         
     def fetch_active_fires(self, country_code="IRN", source="VIIRS_SNPP_NRT", day_range=1):
         """
@@ -98,7 +110,7 @@ class FirmsClient:
         
         try:
             logger.info(f"Fetching active fires from NASA FIRMS API in BBox {bbox_str} using source: {source}...")
-            response = requests.get(url, timeout=15)
+            response = requests.get(url, timeout=30)
             
             # NASA FIRMS returns HTTP 200 even on authentication failure, with "Invalid MAP_KEY" text in the body.
             if response.status_code == 200:
