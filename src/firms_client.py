@@ -46,30 +46,39 @@ class FirmsClient:
         """
         import pandas as pd
         all_dfs = []
+        any_successful = False  # Track whether at least one API call succeeded (even if empty)
         
         for source in self.viirs_sources:
             try:
                 logger.info(f"Querying {source}...")
                 df = self.fetch_active_fires(country_code=country_code, source=source, day_range=day_range)
-                if df is not None and not df.empty:
-                    df["source"] = source
-                    # Tag satellite name for readability
-                    satellite_map = {
-                        "VIIRS_SNPP_NRT": "Suomi-NPP",
-                        "VIIRS_NOAA20_NRT": "NOAA-20",
-                        "VIIRS_NOAA21_NRT": "NOAA-21"
-                    }
-                    df["satellite_name"] = satellite_map.get(source, source)
-                    all_dfs.append(df)
-                    logger.info(f"{source}: {len(df)} hotspots found.")
+                if df is not None:
+                    any_successful = True
+                    if not df.empty:
+                        df["source"] = source
+                        # Tag satellite name for readability
+                        satellite_map = {
+                            "VIIRS_SNPP_NRT": "Suomi-NPP",
+                            "VIIRS_NOAA20_NRT": "NOAA-20",
+                            "VIIRS_NOAA21_NRT": "NOAA-21"
+                        }
+                        df["satellite_name"] = satellite_map.get(source, source)
+                        all_dfs.append(df)
+                        logger.info(f"{source}: {len(df)} hotspots found.")
+                    else:
+                        logger.info(f"{source}: No hotspots returned (empty response).")
                 else:
-                    logger.info(f"{source}: No hotspots or fetch failed.")
+                    logger.warning(f"{source}: API request failed (network error or auth issue).")
             except Exception as e:
                 logger.warning(f"Failed to fetch from {source}: {e}. Continuing with other sensors.")
         
         if not all_dfs:
-            logger.warning("No hotspots retrieved from any VIIRS sensor.")
-            return pd.DataFrame()
+            if any_successful:
+                logger.info("No hotspots detected by any VIIRS sensor in the target area.")
+                return pd.DataFrame()
+            else:
+                logger.error("All VIIRS API requests failed (network errors on all 3 sensors). Returning None to trigger retry.")
+                return None
         
         combined = pd.concat(all_dfs, ignore_index=True)
         logger.info(f"Multi-sensor fusion complete: {len(combined)} total hotspots from {len(all_dfs)} sensor(s).")
