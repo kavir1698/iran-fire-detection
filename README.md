@@ -181,9 +181,27 @@ The pipeline now runs automatically every 30 minutes, 24/7, at zero cost.
 4. In the Streamlit Cloud dashboard → **Settings** → **Secrets**, paste all 6 key-value pairs from your `.env` (in TOML format, e.g. `NASA_FIRMS_KEY = "your_key"`)
 5. Your dashboard will be live at `https://<app-name>.streamlit.app`
 
-### 10. Train a Custom Smoke Detection Model (Optional)
+### 10. Download the Smoke Detection Model
 
-The pipeline includes a CV fallback for smoke detection. For better accuracy, train a YOLOv8 model using the Jupyter notebook in `notebooks/smoke_detection_training.ipynb` on Kaggle or Google Colab (free GPU). Place the resulting `model.pt` file in the project root and the pipeline automatically uses it.
+The pipeline uses a YOLOv8 model to detect smoke plumes in satellite imagery. You have three options:
+
+**Option A — Automatic (zero config, recommended):**  
+The pipeline auto-downloads a free forest-fire detection model from Hugging Face on first run. No setup needed — it just works.
+
+**Option B — Download manually:**
+```bash
+python download_model.py            # downloads the built-in free model (~22 MB)
+python download_model.py --list     # list available sources
+python download_model.py --url URL  # download from any direct URL
+```
+
+**Option C — Train your own:**  
+Use the notebook at `notebooks/smoke_detection_training.ipynb` on Kaggle or Google Colab (free GPU). Place the resulting `model.pt` file in the project root.
+
+**Option D — Custom hosted model:**  
+Set `SMOKE_MODEL_URL` in `.env` to a direct download URL for your model. The pipeline downloads it on every run where the local file is missing.
+
+> If no model is available, the pipeline falls back to a computer-vision heuristic smoke detector — functional but less accurate.
 
 ## ⚙️ Configuration
 
@@ -211,6 +229,18 @@ These constants in `pipeline.py` control the sensitivity of the detection engine
 | `CDSE_USERNAME` | ✅ | Copernicus CDSE email |
 | `CDSE_PASSWORD` | ✅ | Copernicus CDSE password |
 | `DATABASE_URL` | ✅ | PostgreSQL/Supabase connection string |
+| `SMOKE_MODEL_URL` | — | Direct download URL for a custom smoke detection model (optional) |
+
+## 🔥 Smoke Detection Model
+
+On first run, the pipeline automatically downloads a free [YOLOv8s forest-fire detection model](https://huggingface.co/touati-kamel/yolov8s-forest-fire-detection) from Hugging Face (~22 MB). The fallback chain is:
+
+1. **Local `model.pt`** — highest priority, use your own trained model
+2. **`SMOKE_MODEL_URL`** env var — download from any HTTP URL on each run
+3. **Built-in Hugging Face model** — automatic, free, zero-config
+4. **CV heuristic** — OpenCV-based smoke analysis (always available, less accurate)
+
+You can also run `python download_model.py` to pre-download the model before your first pipeline run.
 
 ## 📁 Project Structure
 

@@ -16,6 +16,12 @@ except ImportError:
 
 logger = logging.getLogger("smoke_detector")
 
+# Built-in free model sources (tried in order when no local model exists)
+_DEFAULT_HF_MODEL_URL = (
+    "https://huggingface.co/touati-kamel/yolov8s-forest-fire-detection/resolve/main/model.pt"
+)
+
+
 class SmokeDetector:
     # Detection thresholds
     SMOKE_CONFIDENCE_THRESHOLD = 0.35
@@ -43,27 +49,45 @@ class SmokeDetector:
             except Exception as e:
                 logger.error("Failed to load YOLOv8 model: %s. Will attempt download.", e)
 
-        # 2. If not found, try downloading from configured URL
+        # 2. If not found, try downloading from user-configured URL (e.g. custom-trained model)
         if SMOKE_MODEL_URL:
             logger.info("Model not found locally. Attempting download from SMOKE_MODEL_URL...")
             if self._download_model(SMOKE_MODEL_URL, self.model_path):
                 try:
                     self.model = YOLO(self.model_path)
-                    logger.info("Downloaded model loaded successfully.")
+                    logger.info("Downloaded custom model loaded successfully.")
                     return
                 except Exception as e:
-                    logger.error("Failed to load downloaded model: %s.", e)
+                    logger.error("Failed to load custom model from SMOKE_MODEL_URL: %s.", e)
+                    logger.warning("Custom model download succeeded but YOLO load failed — NOT falling back to built-in model to avoid overwriting your custom weights.")
+                    logger.warning("Fix the model and re-run, or delete %s to allow the built-in fallback.", self.model_path)
+                    self.model = None
+                    return
             else:
-                logger.warning("Model download failed. Continuing without AI smoke detection.")
+                logger.warning("Model download from SMOKE_MODEL_URL failed.")
 
-        # 3. No model available — fall back to CV heuristics
+        # 3. Try the built-in free Hugging Face forest-fire detection model
+        logger.info("Attempting download from built-in free Hugging Face model...")
+        logger.info("Source: touati-kamel/yolov8s-forest-fire-detection (YOLOv8s, ~22 MB)")
+        if self._download_model(_DEFAULT_HF_MODEL_URL, self.model_path):
+            try:
+                self.model = YOLO(self.model_path)
+                logger.info("Hugging Face forest-fire model loaded successfully.")
+                return
+            except Exception as e:
+                logger.error("Failed to load Hugging Face model: %s.", e)
+        else:
+            logger.warning("Built-in model download failed.")
+
+        # 4. No model available — fall back to CV heuristics
         logger.info("Smoke detection model weights file '%s' not found.", self.model_path)
         logger.info("System will run in Simulation / Computer Vision fallback mode.")
-        logger.info("To enable AI smoke detection, set SMOKE_MODEL_URL in .env or place model.pt in the project root.")
+        logger.info("To use a custom model, set SMOKE_MODEL_URL in .env or place model.pt in the project root.")
         self.model = None
 
     def _download_model(self, url, dest_path):
-        """Downloads model weights from a URL with progress logging."""
+        """Downloads model weights from a URL with progress logging. Writes atomically."""
+        tmp_path = dest_path + ".download"
         try:
             logger.info("Downloading model from %s ...", url)
             response = requests.get(url, stream=True, timeout=300)
@@ -71,7 +95,7 @@ class SmokeDetector:
 
             total_size = int(response.headers.get("content-length", 0))
             downloaded = 0
-            with open(dest_path, "wb") as f:
+            with open(tmp_path, "wb") as f:
                 for chunk in response.iter_content(chunk_size=8192):
                     f.write(chunk)
                     downloaded += len(chunk)
@@ -79,17 +103,18 @@ class SmokeDetector:
                         pct = (downloaded / total_size) * 100
                         logger.info("Download progress: %.1f%% (%d / %d bytes)", pct, downloaded, total_size)
 
+            os.replace(tmp_path, dest_path)  # atomic on same filesystem
             file_size_mb = os.path.getsize(dest_path) / (1024 * 1024)
             logger.info("Model downloaded successfully (%.1f MB) to %s", file_size_mb, dest_path)
             return True
         except Exception as e:
             logger.error("Model download failed: %s", e)
-            # Clean up partial download
-            if os.path.exists(dest_path):
-                try:
-                    os.remove(dest_path)
-                except OSError:
-                    pass
+            for p in (tmp_path,):
+                if os.path.exists(p):
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
             return False
 
     def _draw_ai_overlay(self, img, title, status_text, status_color, smoke_mask=None):

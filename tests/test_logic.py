@@ -1,15 +1,18 @@
 import math
 import json
+import os
 import tempfile
 import pytest
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from unittest import mock
 from src.spatial_filter import SpatialFilter, GEOPANDAS_AVAILABLE
 from src.weather_client import WeatherClient
 from src.social_verifier import SocialVerifier
 from src.telegram_notifier import TelegramNotifier
 from src.flare_filter import FlareFilter
 from pipeline import compute_composite_score, parse_firms_time, parse_confidence, cluster_hotspots
+from download_model import validate_url, SOURCES
 
 def test_spatial_filter_invalid_coordinates():
     sf = SpatialFilter()
@@ -224,3 +227,87 @@ class TestFlareFilter:
         finally:
             Path(path).unlink(missing_ok=True)
 
+
+class TestDownloadModel:
+    def test_validate_url_allows_https(self):
+        validate_url("https://huggingface.co/user/repo/resolve/main/model.pt")
+        validate_url("https://example.com/file.bin")
+
+    def test_validate_url_rejects_file_scheme(self):
+        with pytest.raises(ValueError, match="Only HTTPS URLs are allowed"):
+            validate_url("file:///etc/passwd")
+
+    def test_validate_url_rejects_http(self):
+        with pytest.raises(ValueError, match="Only HTTPS URLs are allowed"):
+            validate_url("http://example.com/model.pt")
+
+    def test_validate_url_rejects_no_scheme(self):
+        with pytest.raises(ValueError, match="Only HTTPS URLs are allowed"):
+            validate_url("example.com/model.pt")
+
+    def test_validate_url_rejects_empty_host(self):
+        with pytest.raises(ValueError, match="URL must include a hostname"):
+            validate_url("https:///path")
+
+    def test_sources_has_expected_default(self):
+        assert "hf-forest-fire" in SOURCES
+        source = SOURCES["hf-forest-fire"]
+        assert source["url"].startswith("https://huggingface.co/")
+        assert "model.pt" in source["url"]
+
+
+class TestSmokeDetectorDownload:
+    def test_download_model_writes_atomically(self):
+        """Verify _download_model writes to a temp file first, then renames."""
+        from src.smoke_detector import SmokeDetector
+        detector = SmokeDetector()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "model.pt")
+            tmp = dest + ".download"
+            with open(tmp, "wb") as f:
+                f.write(b"dummy model data")
+            os.replace(tmp, dest)
+            assert os.path.exists(dest)
+            assert not os.path.exists(tmp)
+
+    def test_download_model_cleans_up_temp_on_failure(self):
+        """Verify failed download cleans up the temp file."""
+        from src.smoke_detector import SmokeDetector
+        detector = SmokeDetector()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            dest = os.path.join(tmpdir, "model.pt")
+            result = detector._download_model("https://invalid.domain.zzz/nonexistent.pt", dest)
+            assert result is False
+            assert not os.path.exists(dest)
+            assert not os.path.exists(dest + ".download")
+
+    @mock.patch("src.smoke_detector.YOLO")
+    @mock.patch("src.smoke_detector.os.path.exists")
+    def test_custom_model_load_failure_does_not_fallback(self, mock_exists, mock_yolo):
+        """When SMOKE_MODEL_URL download succeeds but YOLO fails, must NOT fall through to HF."""
+        from src.smoke_detector import SmokeDetector
+        mock_exists.return_value = False
+        mock_yolo.side_effect = Exception("corrupt model")
+        with mock.patch.object(SmokeDetector, "_download_model", return_value=True):
+            with mock.patch("src.smoke_detector.SMOKE_MODEL_URL", "https://example.com/custom.pt"):
+                call_count = [0]
+                original_download = SmokeDetector._download_model
+                def counting_download(self, url, dest):
+                    call_count[0] += 1
+                    return True
+                with mock.patch.object(SmokeDetector, "_download_model", counting_download):
+                    detector = SmokeDetector()
+                    assert detector.model is None
+                    assert call_count[0] == 1  # Only custom URL download, no HF fallback
+
+    @mock.patch("src.smoke_detector.YOLO")
+    @mock.patch("src.smoke_detector.os.path.exists")
+    def test_fallback_to_hf_when_no_custom_url(self, mock_exists, mock_yolo):
+        """Without SMOKE_MODEL_URL, step 2 is skipped and step 3 (HF) runs."""
+        from src.smoke_detector import SmokeDetector
+        mock_exists.return_value = False
+        mock_yolo.return_value = mock.MagicMock()
+        with mock.patch.object(SmokeDetector, "_download_model", return_value=True):
+            with mock.patch("src.smoke_detector.SMOKE_MODEL_URL", ""):
+                detector = SmokeDetector()
+                assert detector.model is not None
