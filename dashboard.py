@@ -6,6 +6,7 @@ Real-time satellite active-fire detection & AI verification platform.
 import base64
 import json
 import logging
+import re
 import time
 import uuid
 from datetime import datetime, time as dt_time, timezone, timedelta
@@ -693,8 +694,7 @@ else:
 
 m = folium.Map(
     location=map_center, zoom_start=zoom_start,
-    tiles="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
-    attr='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+    tiles="cartodbpositron",
 )
 
 # Forest boundary overlay
@@ -785,6 +785,7 @@ for _, row in df_map.iterrows():
     ).add_to(m)
 
 map_html = m._repr_html_()  # type: ignore[attr-defined]
+map_html = re.sub(r'(?<!\\)\\([0-9])', r'\\\\\1', map_html)
 components.html(map_html, height=620, scrolling=False)
 
 # ═══════════════════════════════════════════════════════════════
