@@ -590,30 +590,36 @@ def run_pipeline():
             
             logger.info(f"Composite confidence score: {composite_score}/100 (threshold: CONFIRM={COMPOSITE_CONFIRM}, PENDING={COMPOSITE_PENDING})")
 
-            # Update composite score in database
-            try:
-                fire_data_update = {"composite_score": composite_score}
-                # Only update composite_score field on existing record
-                db.update_fire_status(fire_id, fire_data.get("status", "PENDING") if not updating_pending_id else existing.get("status", "PENDING"))
-            except Exception:
-                pass  # Non-critical update
+            # -------------------------------------------------------------------
+            # Status decision driven by composite score (integrates ALL signals)
+            # The legacy auto_confirm (FRP + cluster) is already embedded in the
+            # composite score via thermal (FRP) and clustering signal weights.
+            # -------------------------------------------------------------------
+            if composite_score >= COMPOSITE_CONFIRM:
+                final_status = "CONFIRMED"
+                db.update_fire_status(fire_id, "CONFIRMED")
+                fire_data["status"] = "CONFIRMED"
+            elif composite_score < COMPOSITE_PENDING:
+                # Very weak evidence — mark as FALSE_POSITIVE candidate
+                final_status = "FALSE_POSITIVE"
+                db.update_fire_status(fire_id, "FALSE_POSITIVE")
+            else:
+                # In the grey zone — keep as PENDING for future re-evaluation
+                final_status = "PENDING"
 
             if image_path:
-                # If smoke is detected, or if we were auto-confirmed by FRP/cluster rules, alert!
-                if smoke_detected or auto_confirm:
-                    final_status = "CONFIRMED"
-                    
-                    # Upgrade status in DB to CONFIRMED
+                if final_status == "CONFIRMED":
+                    # Upgrade status in DB with image metadata
                     db.update_fire_status(fire_id, "CONFIRMED", product_id, quicklook_url=image_path)
-                    
-                    # Setup specific alert notes
+
+                    # Build alert bypass message with composite-score context
                     alert_bypass_reason = bypass_reason
-                    if not smoke_detected and auto_confirm:
+                    if not smoke_detected:
                         alert_bypass_reason = (
                             f"{bypass_reason or ''}\n"
-                            f"💨 <i>Optical imagery loaded but smoke plume verification fell back to thermal signature context.</i>"
+                            f"💨 <i>Composite score ({composite_score}/100) confirms fire via thermal + environmental signals despite no visible smoke plume.</i>"
                         )
-                    
+
                     # Add composite score & social summary to alert
                     score_note = f"\n📊 <b>Composite Score:</b> {composite_score}/100"
                     if multi_sensor_count >= 2:
@@ -622,50 +628,59 @@ def run_pipeline():
                         score_note += " | 🌙 Night detection"
                     if social_note:
                         score_note += social_note
-                    
+
                     alert_msg = notifier.format_fire_alert(
                         lat=lat, lon=lon, frp=frp, confidence=confidence, acq_time=acq_time_str,
                         status=final_status, temp=temp, humidity=humidity, wind_speed=wind_speed,
-                        wind_direction=wind_direction, risk_score=risk_score, 
+                        wind_direction=wind_direction, risk_score=risk_score,
                         bypass_reason=(alert_bypass_reason or "") + score_note
                     )
 
-                    
                     # Attach the annotated image (the 'AI look') if available
                     photo_to_send = annotated_path if annotated_path else image_path
                     notifier.send_photo(photo_to_send, caption=alert_msg)
                     db.mark_fire_notified(fire_id)
                     alerts_triggered += 1
-                else:
-                    # No smoke detected, and not auto-confirmed -> Flag as FALSE_POSITIVE
-                    logger.info(f"No smoke plume detected in Sentinel-2/Landsat image. Composite score: {composite_score}. Flagging as FALSE_POSITIVE.")
+
+                elif final_status == "FALSE_POSITIVE":
+                    logger.info(f"Composite score {composite_score} below PENDING threshold ({COMPOSITE_PENDING}). Flagging as FALSE_POSITIVE.")
                     db.update_fire_status(fire_id, "FALSE_POSITIVE", product_id, quicklook_url=image_path)
+
+                else:
+                    # PENDING: image available but composite score is inconclusive
+                    logger.info(f"Composite score {composite_score} in PENDING range ({COMPOSITE_PENDING}-{COMPOSITE_CONFIRM}). Awaiting further verification.")
+
             else:
                 # Optical image was unavailable (cloud cover/orbital gap/timeout)
                 logger.info("Satellite optical imagery unavailable (cloud cover or orbital gap).")
-                
-                if auto_confirm:
-                    # If we auto-confirmed, we STILL send the Telegram message (text-only) with our bypass reason
-                    logger.info("Sending text-only alert to Telegram since image is unavailable.")
-                    
+
+                if final_status == "CONFIRMED":
+                    # Composite score is high enough to confirm even without optical imagery
+                    logger.info(f"Sending text-only alert to Telegram — composite score {composite_score} confirms fire.")
+
                     score_note = f"\n📊 <b>Composite Score:</b> {composite_score}/100"
                     if multi_sensor_count >= 2:
                         score_note += f" | 🛰️ <b>{multi_sensor_count} satellites</b> confirmed"
                     if is_nighttime:
                         score_note += " | 🌙 Night detection"
-                    
+
                     alert_msg = notifier.format_fire_alert(
                         lat=lat, lon=lon, frp=frp, confidence=confidence, acq_time=acq_time_str,
                         status="CONFIRMED", temp=temp, humidity=humidity, wind_speed=wind_speed,
-                        wind_direction=wind_direction, risk_score=risk_score, 
+                        wind_direction=wind_direction, risk_score=risk_score,
                         bypass_reason=(bypass_reason or "") + score_note
                     )
                     notifier.send_message(alert_msg)
                     db.mark_fire_notified(fire_id)
                     alerts_triggered += 1
+
+                elif final_status == "FALSE_POSITIVE":
+                    logger.info(f"Composite score {composite_score} below PENDING threshold ({COMPOSITE_PENDING}) — no image available. Flagging as FALSE_POSITIVE.")
+                    db.update_fire_status(fire_id, "FALSE_POSITIVE")
+
                 else:
-                    # Weak isolated fire with no image -> stays PENDING in DB, no alert sent
-                    logger.info(f"Storing in database as PENDING verification. Composite score: {composite_score} (no Telegram alert sent).")
+                    # PENDING: no image and composite score inconclusive — wait for next satellite pass
+                    logger.info(f"Composite score {composite_score} in PENDING range ({COMPOSITE_PENDING}-{COMPOSITE_CONFIRM}) — no image. Awaiting next satellite pass.")
 
         logger.info("=================================================================")
         logger.info(f"PIPELINE COMPLETED. Hotspots Processed: {processed_count} | Warnings Sent: {alerts_triggered}")

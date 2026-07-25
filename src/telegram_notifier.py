@@ -1,8 +1,11 @@
 import os
 import html
 import time
+import logging
 import requests
 from src.config import TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+
+logger = logging.getLogger("telegram_notifier")
 
 class TelegramNotifier:
     def __init__(self, token=TELEGRAM_BOT_TOKEN, chat_id=TELEGRAM_CHAT_ID):
@@ -13,7 +16,7 @@ class TelegramNotifier:
     def send_message(self, text, parse_mode="HTML"):
         """Sends a text message to the configured Telegram chat/channel with 429 rate limit handling."""
         if not self.token or "change-me" in str(self.token).lower() or not self.chat_id or "change-me" in str(self.chat_id).lower():
-            print("[WARNING] Telegram credentials not configured. Skipping message notification.")
+            logger.warning("Telegram credentials not configured. Skipping message notification.")
             return False
             
         url = f"{self.base_url}/sendMessage"
@@ -29,18 +32,18 @@ class TelegramNotifier:
                 response = requests.post(url, json=payload, timeout=15)
                     
                 if response.status_code == 200:
-                    print("[INFO] Telegram text alert sent successfully.")
+                    logger.info("Telegram text alert sent successfully.")
                     return True
                 elif response.status_code == 429:
                     res_json = response.json()
                     retry_after = int(res_json.get("parameters", {}).get("retry_after", 5))
-                    print(f"[WARNING] Telegram rate limit hit. Sleeping for {retry_after}s (Attempt {attempt+1}/3)...")
+                    logger.warning("Telegram rate limit hit. Sleeping for %ds (Attempt %d/3)...", retry_after, attempt + 1)
                     time.sleep(retry_after)
                 else:
-                    print(f"[ERROR] Failed to send Telegram message: {response.status_code} - {response.text}")
+                    logger.error("Failed to send Telegram message: %s - %s", response.status_code, response.text)
                     return False
             except Exception as e:
-                print(f"[ERROR] Exception sending Telegram message: {e}")
+                logger.error("Exception sending Telegram message: %s", e)
                 time.sleep(2)
                 
         return False
@@ -48,11 +51,11 @@ class TelegramNotifier:
     def send_photo(self, photo_path, caption="", parse_mode="HTML"):
         """Sends a photo with a caption to the configured Telegram chat/channel with rate limit handling."""
         if not self.token or "change-me" in str(self.token).lower() or not self.chat_id or "change-me" in str(self.chat_id).lower():
-            print("[WARNING] Telegram credentials not configured. Skipping photo notification.")
+            logger.warning("Telegram credentials not configured. Skipping photo notification.")
             return False
             
         if not os.path.exists(photo_path):
-            print(f"[ERROR] Photo file not found at {photo_path}. Sending text alert instead.")
+            logger.error("Photo file not found at %s. Sending text alert instead.", photo_path)
             return self.send_message(caption, parse_mode=parse_mode)
             
         url = f"{self.base_url}/sendPhoto"
@@ -67,22 +70,22 @@ class TelegramNotifier:
                         "parse_mode": parse_mode
                     }
                     
-                    print(f"[INFO] Uploading and sending photo {photo_path} to Telegram...")
+                    logger.info("Uploading and sending photo %s to Telegram...", photo_path)
                     response = requests.post(url, files=files, data=data, timeout=30)
                     
                     if response.status_code == 200:
-                        print("[INFO] Telegram photo alert sent successfully.")
+                        logger.info("Telegram photo alert sent successfully.")
                         return True
                     elif response.status_code == 429:
                         res_json = response.json()
                         retry_after = int(res_json.get("parameters", {}).get("retry_after", 5))
-                        print(f"[WARNING] Telegram rate limit hit on photo upload. Sleeping for {retry_after}s...")
+                        logger.warning("Telegram rate limit hit on photo upload. Sleeping for %ds...", retry_after)
                         time.sleep(retry_after)
                     else:
-                        print(f"[ERROR] Failed to send Telegram photo: {response.status_code} - {response.text}")
+                        logger.error("Failed to send Telegram photo: %s - %s", response.status_code, response.text)
                         return self.send_message(caption, parse_mode=parse_mode)
             except Exception as e:
-                print(f"[ERROR] Exception sending Telegram photo: {e}")
+                logger.error("Exception sending Telegram photo: %s", e)
                 time.sleep(2)
                 
         return self.send_message(caption, parse_mode=parse_mode)

@@ -63,6 +63,14 @@ GEOJSON_PATH = BASE_DIR / "iran_forest_zone.geojson"
 # Path to the known flare exclusion zones file
 FLARE_EXCLUSION_PATH = BASE_DIR / "flare_exclusion_zones.json"
 
+# Smoke detection model (YOLOv8 weights)
+# Set SMOKE_MODEL_URL in .env to a direct download URL for a custom-trained fire/smoke model.
+# If unset, the detector will try 'model.pt' from disk, then fall back to CV heuristics.
+# Example: SMOKE_MODEL_URL=https://your-storage.com/fire-smoke-model.pt
+SMOKE_MODEL_URL = get_secret("SMOKE_MODEL_URL", "")
+# Local path where the model will be saved after download (default: model.pt in project root)
+SMOKE_MODEL_PATH = str(BASE_DIR / "model.pt")
+
 def validate_config(check_db=True, check_copernicus=True):
     """Validates that crucial environment variables are loaded."""
     missing = []

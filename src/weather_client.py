@@ -4,7 +4,10 @@ try:
 except ImportError:
     pass
 
+import logging
 import requests
+
+logger = logging.getLogger("weather_client")
 
 class WeatherClient:
     def __init__(self):
@@ -32,7 +35,7 @@ class WeatherClient:
         }
         
         try:
-            print(f"[INFO] Fetching weather from Open-Meteo for coordinates ({lat:.4f}, {lon:.4f})...")
+            logger.info("Fetching weather from Open-Meteo for coordinates (%.4f, %.4f)...", lat, lon)
             response = requests.get(self.base_url, params=params, timeout=10)
             
             if response.status_code == 200:
@@ -64,15 +67,15 @@ class WeatherClient:
                     "days_since_rain": days_since_rain,
                     "precip_7day": round(precip_7day, 2)
                 }
-                print(f"[INFO] Weather fetched: Temp={metrics['temp']}°C, Humidity={metrics['humidity']}%, "
-                      f"Wind={metrics['wind_speed']} km/h, Precip={metrics['precipitation']} mm, "
-                      f"Days since rain={metrics['days_since_rain']}, 7-day precip={metrics['precip_7day']} mm")
+                logger.info("Weather fetched: Temp=%s°C, Humidity=%s%%, Wind=%s km/h, Precip=%s mm, Days since rain=%s, 7-day precip=%s mm",
+                            metrics['temp'], metrics['humidity'], metrics['wind_speed'], metrics['precipitation'],
+                            metrics['days_since_rain'], metrics['precip_7day'])
                 return metrics
             else:
-                print(f"[ERROR] Failed to fetch weather from Open-Meteo: {response.status_code} - {response.text}")
+                logger.error("Failed to fetch weather from Open-Meteo: %s - %s", response.status_code, response.text)
                 return None
         except Exception as e:
-            print(f"[ERROR] Exception during Open-Meteo call: {e}")
+            logger.error("Exception during Open-Meteo call: %s", e)
             return None
             
     def calculate_fire_risk(self, temp, humidity, wind_speed, wind_direction,
@@ -102,7 +105,7 @@ class WeatherClient:
         if days_since_rain is not None and days_since_rain >= 5 and humidity < 30.0:
             drought_active = True
             base_index = min(100.0, base_index * 1.15)
-            print("[WARNING] DROUGHT MODIFIER ACTIVE: No rain in 5+ days with low humidity. Fire risk boosted.")
+            logger.warning("DROUGHT MODIFIER ACTIVE: No rain in 5+ days with low humidity. Fire risk boosted.")
         
         # 5. Extreme Wind Check: hot, dry conditions with strong winds
         #    (Replaces North Africa-specific Sirocco with a generic extreme wind modifier)
@@ -116,9 +119,9 @@ class WeatherClient:
             # Boost fire risk by 30% due to highly flammable wind conditions
             risk_index = min(100.0, base_index * 1.30)
             if drought_active:
-                print("[WARNING] EXTREME WIND EFFECT ACTIVE (stacked with drought): Extreme fire conditions.")
+                logger.warning("EXTREME WIND EFFECT ACTIVE (stacked with drought): Extreme fire conditions.")
             else:
-                print("[WARNING] EXTREME WIND EFFECT ACTIVE: Hot, dry, strong winds. Fire risk boosted.")
+                logger.warning("EXTREME WIND EFFECT ACTIVE: Hot, dry, strong winds. Fire risk boosted.")
         else:
             risk_index = base_index
             

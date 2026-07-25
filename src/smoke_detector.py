@@ -1,5 +1,8 @@
 import os
+import logging
+import requests
 import numpy as np
+from src.config import SMOKE_MODEL_URL, SMOKE_MODEL_PATH
 
 try:
     import cv2
@@ -11,35 +14,83 @@ try:
 except ImportError:
     YOLO = None
 
+logger = logging.getLogger("smoke_detector")
+
 class SmokeDetector:
     # Detection thresholds
     SMOKE_CONFIDENCE_THRESHOLD = 0.35
     # YOLO class IDs for fire/smoke (adjust based on your model's classes)
     FIRE_SMOKE_CLASSES = None  # None = accept all classes; set to {0, 1} etc. if model has specific fire/smoke class IDs
 
-    def __init__(self, model_path="model.pt"):
-        self.model_path = model_path
+    def __init__(self, model_path=None):
+        self.model_path = model_path or SMOKE_MODEL_PATH
         self.model = None
         self._load_model()
         
     def _load_model(self):
-        """Loads custom YOLOv8 model if weights exist, otherwise configures fallback."""
+        """Loads custom YOLOv8 model if weights exist, otherwise attempts download or fallback."""
         if YOLO is None:
-            print("[WARNING] Ultralytics YOLO library not installed. Smoke detector will use CV fallback.")
+            logger.warning("Ultralytics YOLO library not installed. Smoke detector will use CV fallback.")
             return
 
+        # 1. Try loading from disk
         if os.path.exists(self.model_path):
             try:
-                print(f"[INFO] Loading custom YOLOv8 smoke detection model from {self.model_path}...")
+                logger.info("Loading custom YOLOv8 smoke detection model from %s...", self.model_path)
                 self.model = YOLO(self.model_path)
-                print("[INFO] Custom YOLOv8 model loaded successfully.")
+                logger.info("Custom YOLOv8 model loaded successfully.")
+                return
             except Exception as e:
-                print(f"[ERROR] Failed to load YOLOv8 model: {e}. Falling back to CV.")
-                self.model = None
-        else:
-            print(f"[INFO] Smoke detection model weights file '{self.model_path}' not found.")
-            print("[INFO] System will run in Simulation / Computer Vision fallback mode.")
-            self.model = None
+                logger.error("Failed to load YOLOv8 model: %s. Will attempt download.", e)
+
+        # 2. If not found, try downloading from configured URL
+        if SMOKE_MODEL_URL:
+            logger.info("Model not found locally. Attempting download from SMOKE_MODEL_URL...")
+            if self._download_model(SMOKE_MODEL_URL, self.model_path):
+                try:
+                    self.model = YOLO(self.model_path)
+                    logger.info("Downloaded model loaded successfully.")
+                    return
+                except Exception as e:
+                    logger.error("Failed to load downloaded model: %s.", e)
+            else:
+                logger.warning("Model download failed. Continuing without AI smoke detection.")
+
+        # 3. No model available — fall back to CV heuristics
+        logger.info("Smoke detection model weights file '%s' not found.", self.model_path)
+        logger.info("System will run in Simulation / Computer Vision fallback mode.")
+        logger.info("To enable AI smoke detection, set SMOKE_MODEL_URL in .env or place model.pt in the project root.")
+        self.model = None
+
+    def _download_model(self, url, dest_path):
+        """Downloads model weights from a URL with progress logging."""
+        try:
+            logger.info("Downloading model from %s ...", url)
+            response = requests.get(url, stream=True, timeout=300)
+            response.raise_for_status()
+
+            total_size = int(response.headers.get("content-length", 0))
+            downloaded = 0
+            with open(dest_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+                    if total_size > 0 and downloaded % (10 * 1024 * 1024) < 8192:  # log every ~10MB
+                        pct = (downloaded / total_size) * 100
+                        logger.info("Download progress: %.1f%% (%d / %d bytes)", pct, downloaded, total_size)
+
+            file_size_mb = os.path.getsize(dest_path) / (1024 * 1024)
+            logger.info("Model downloaded successfully (%.1f MB) to %s", file_size_mb, dest_path)
+            return True
+        except Exception as e:
+            logger.error("Model download failed: %s", e)
+            # Clean up partial download
+            if os.path.exists(dest_path):
+                try:
+                    os.remove(dest_path)
+                except OSError:
+                    pass
+            return False
 
     def _draw_ai_overlay(self, img, title, status_text, status_color, smoke_mask=None):
         """Draws a premium, high-tech GIS scanning overlay on the image."""
@@ -87,7 +138,7 @@ class SmokeDetector:
         Returns a tuple: (smoke_detected: bool, confidence: float, output_image_path: str)
         """
         if not os.path.exists(image_path):
-            print(f"[ERROR] Image file {image_path} does not exist. Cannot run smoke detection.")
+            logger.error("Image file %s does not exist. Cannot run smoke detection.", image_path)
             return False, 0.0, None
 
         out_dir = os.path.dirname(image_path)
@@ -97,7 +148,7 @@ class SmokeDetector:
         # 1. Use YOLO model if loaded
         if self.model is not None:
             try:
-                print(f"[INFO] Running YOLOv8 smoke detection on {image_path}...")
+                logger.info("Running YOLOv8 smoke detection on %s...", image_path)
                 results = self.model(image_path)
                 result = results[0]
                 boxes = result.boxes
@@ -114,7 +165,7 @@ class SmokeDetector:
                     
                     if valid_boxes:
                         best_conf = max(v[0] for v in valid_boxes)
-                        print(f"[INFO] YOLOv8 smoke/fire detection CONFIRMED with confidence: {best_conf:.2%} ({len(valid_boxes)} valid detections)")
+                        logger.info("YOLOv8 smoke/fire detection CONFIRMED with confidence: %.2f%% (%d valid detections)", best_conf * 100, len(valid_boxes))
                         
                         # Save standard YOLO bounding box image
                         result.save(filename=out_path)
@@ -135,9 +186,9 @@ class SmokeDetector:
                     else:
                         # Detections exist but all below threshold
                         below_thresh_conf = float(max(boxes.conf))
-                        print(f"[INFO] YOLOv8 detections found but below confidence threshold ({below_thresh_conf:.2%} < {self.SMOKE_CONFIDENCE_THRESHOLD:.0%}). Treating as no detection.")
+                        logger.info("YOLOv8 detections found but below confidence threshold (%.2f%% < %.0f%%). Treating as no detection.", below_thresh_conf * 100, self.SMOKE_CONFIDENCE_THRESHOLD * 100)
                 else:
-                    print("[INFO] YOLOv8 inference completed: No smoke or fire detected.")
+                    logger.info("YOLOv8 inference completed: No smoke or fire detected.")
                     
                     # Generate unconfirmed HUD image for context
                     if cv2 is not None:
@@ -153,12 +204,12 @@ class SmokeDetector:
                             
                     return False, 0.0, out_path
             except Exception as e:
-                print(f"[ERROR] YOLOv8 inference failed: {e}. Falling back to CV analysis.")
+                logger.error("YOLOv8 inference failed: %s. Falling back to CV analysis.", e)
 
         # 2. Fallback: OpenCV color and texture heuristic
         if cv2 is None:
             # Absolute fallback if OpenCV is missing
-            print("[WARNING] OpenCV not installed. Falling back to simple simulation classification.")
+            logger.warning("OpenCV not installed. Falling back to simple simulation classification.")
             is_mock_fp = "fp" in os.path.basename(image_path).lower()
             return (not is_mock_fp), 0.85, image_path
 
@@ -170,10 +221,10 @@ class SmokeDetector:
         Detects bright, desaturated (grayish/whitish) plumes on a forest background.
         """
         try:
-            print(f"[INFO] Running CV heuristic smoke detector on {image_path}...")
+            logger.info("Running CV heuristic smoke detector on %s...", image_path)
             img = cv2.imread(image_path)
             if img is None:
-                print("[ERROR] OpenCV failed to read image.")
+                logger.error("OpenCV failed to read image.")
                 return False, 0.0, image_path
                 
             # Convert to HSV color space
@@ -200,13 +251,13 @@ class SmokeDetector:
             smoke_pixels = cv2.countNonZero(smoke_mask)
             smoke_ratio = (smoke_pixels / total_pixels) * 100.0
             
-            print(f"[INFO] CV Haze Analysis: {smoke_ratio:.2f}% of pixels match smoke profile.")
+            logger.info("CV Haze Analysis: %.2f%% of pixels match smoke profile.", smoke_ratio)
             
             # Check threshold (3.0% to 45.0% range)
             if 3.0 <= smoke_ratio <= 45.0:
                 confidence = 0.5 + (smoke_ratio / 90.0)
                 confidence = min(0.95, confidence)
-                print(f"[INFO] CV smoke signature CONFIRMED. Confidence: {confidence:.2%}")
+                logger.info("CV smoke signature CONFIRMED. Confidence: %.2f%%", confidence * 100)
                 
                 # Apply overlay with mask highlights in orange
                 img_hud = self._draw_ai_overlay(
@@ -225,9 +276,9 @@ class SmokeDetector:
                 if smoke_ratio > 45.0:
                     status_lbl = "STATUS: CLOUD COVER DETECTED (FILTERED)"
                     status_color = (255, 50, 50) # Blue/red indicator for cloud
-                    print("[INFO] CV Analysis: High desaturated pixel density. Likely heavy cloud cover.")
+                    logger.info("CV Analysis: High desaturated pixel density. Likely heavy cloud cover.")
                 else:
-                    print("[INFO] CV Analysis: Insufficient smoke-like pixel density.")
+                    logger.info("CV Analysis: Insufficient smoke-like pixel density.")
                 
                 # Apply unconfirmed overlay but still show highlight blocks for the "AI look"
                 img_hud = self._draw_ai_overlay(
@@ -242,5 +293,5 @@ class SmokeDetector:
                 return False, 0.0, out_path
                 
         except Exception as e:
-            print(f"[ERROR] CV Fallback analysis failed: {e}")
+            logger.error("CV Fallback analysis failed: %s", e)
             return False, 0.0, image_path
