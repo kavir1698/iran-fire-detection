@@ -3,6 +3,14 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Force IPv4-only connections — GitHub Actions runners often have broken IPv6 routing
+# This must run before any requests or urllib3 imports in downstream modules.
+try:
+    import urllib3.util.connection
+    urllib3.util.connection.HAS_IPV6 = False
+except ImportError:
+    pass
+
 # Get the base directory of the project
 BASE_DIR = Path(__file__).resolve().parent.parent
 
