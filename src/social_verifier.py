@@ -11,13 +11,19 @@ class SocialVerifier:
     against satellite thermal fire hotspots.
     """
     def __init__(self):
-        self.keywords_ar = [
-            "حريق", "حرائق", "غابة", "ألسنة النيران", "دخان",
-            "الحماية المدنية", "تيزي وزو", "بجاية", "جيجل", "سكيكدة", "البويرة", "سطيف"
+        self.keywords_fa = [
+            "آتش سوزی", "آتش‌سوزی", "جنگل", "حریق", "دود", "شعله",
+            "مازندران", "گیلان", "گلستان", "کردستان", "لرستان", "ایلام",
+            "کرمانشاه", "کهگیلویه", "چهارمحال", "فارس", "اردبیل", "آذربایجان",
+            "خراسان شمالی", "سمنان", "البرز",
+            "سازمان جنگل‌ها", "محیط زیست", "آتش نشانی", "هلال احمر"
         ]
-        self.keywords_fr = [
-            "incendie", "feu", "forêt", "fumée", "protection civile",
-            "tizi ouzou", "bejaia", "jijel", "skikda", "bouira", "setif"
+        self.keywords_en = [
+            "fire", "wildfire", "forest fire", "smoke", "flames", "burning",
+            "mazandaran", "gilan", "golestan", "kurdistan", "lorestan", "ilam",
+            "kermanshah", "kohgiluyeh", "chaharmahal", "fars", "ardabil", "azerbaijan",
+            "north khorasan", "semnan", "alborz",
+            "forest ranger", "environmental protection", "fire department", "red crescent"
         ]
 
     @staticmethod
@@ -32,13 +38,13 @@ class SocialVerifier:
         return R * c
 
     def is_fire_related_text(self, text):
-        """Checks if a text string contains Arabic or French fire-related keywords."""
+        """Checks if a text string contains Persian or English fire-related keywords."""
         if not text:
             return False
         text_lower = text.lower()
-        has_ar = any(kw in text for kw in self.keywords_ar)
-        has_fr = any(kw in text_lower for kw in self.keywords_fr)
-        return has_ar or has_fr
+        has_fa = any(kw in text for kw in self.keywords_fa)
+        has_en = any(kw in text_lower for kw in self.keywords_en)
+        return has_fa or has_en
 
     def match_reports_with_hotspot(self, hotspot_lat, hotspot_lon, hotspot_time, reports, max_dist_km=10.0, max_hours=3.0):
         """
@@ -91,7 +97,7 @@ class SocialVerifier:
         if not matched_reports:
             return 0.0
 
-        ranger_confirm = any(r.get("reporter_type") in ("Forest Ranger", "Civil Protection") for r in matched_reports)
+        ranger_confirm = any(r.get("reporter_type") in ("Forest Ranger", "Ranger", "Fire Department") for r in matched_reports)
         if ranger_confirm or len(matched_reports) >= 2:
             return 15.0
         return 10.0
@@ -102,7 +108,7 @@ class SocialVerifier:
             return ""
 
         count = len(matched_reports)
-        ranger_count = sum(1 for r in matched_reports if r.get("reporter_type") in ("Forest Ranger", "Civil Protection"))
+        ranger_count = sum(1 for r in matched_reports if r.get("reporter_type") in ("Forest Ranger", "Ranger", "Fire Department"))
         
         summary = f"\n👥 <b>Crowdsource Verification:</b> {count} report(s) matched within 10 km"
         if ranger_count > 0:

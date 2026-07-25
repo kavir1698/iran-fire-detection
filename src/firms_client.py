@@ -12,25 +12,25 @@ class FirmsClient:
         self.base_url = "https://firms.modaps.eosdis.nasa.gov/api"
         # All available VIIRS sensor sources for multi-sensor fusion
         self.viirs_sources = ["VIIRS_SNPP_NRT", "VIIRS_NOAA20_NRT", "VIIRS_NOAA21_NRT"]
-        # Bounding box for Algeria
-        self.algeria_bbox = {
-            "west": -8.6,
-            "south": 18.9,
-            "east": 11.9,
-            "north": 37.1
+        # Bounding box for Iran
+        self.iran_bbox = {
+            "west": 44.0,
+            "south": 25.0,
+            "east": 63.3,
+            "north": 39.8
         }
         
-    def fetch_active_fires(self, country_code="DZA", source="VIIRS_SNPP_NRT", day_range=1):
+    def fetch_active_fires(self, country_code="IRN", source="VIIRS_SNPP_NRT", day_range=1):
         """
-        Status wrapper to fetch active fires for Algeria.
+        Status wrapper to fetch active fires for Iran.
         Uses the bounding box endpoint internally since the country endpoint is deprecated/disabled by NASA.
         """
-        if country_code == "DZA":
+        if country_code == "IRN":
             return self.fetch_active_fires_bbox(
-                west=self.algeria_bbox["west"],
-                south=self.algeria_bbox["south"],
-                east=self.algeria_bbox["east"],
-                north=self.algeria_bbox["north"],
+                west=self.iran_bbox["west"],
+                south=self.iran_bbox["south"],
+                east=self.iran_bbox["east"],
+                north=self.iran_bbox["north"],
                 source=source,
                 day_range=day_range
             )
@@ -38,7 +38,7 @@ class FirmsClient:
             logger.warning(f"Country code {country_code} requested. Attempting default bounding box search.")
             return self.fetch_active_fires_bbox(source=source, day_range=day_range)
 
-    def fetch_active_fires_multi_sensor(self, country_code="DZA", day_range=1):
+    def fetch_active_fires_multi_sensor(self, country_code="IRN", day_range=1):
         """
         Fetches active fires from ALL available VIIRS sensors (SNPP, NOAA-20, NOAA-21)
         and merges results with source tagging. Multi-sensor detections of the same fire
@@ -75,7 +75,7 @@ class FirmsClient:
         logger.info(f"Multi-sensor fusion complete: {len(combined)} total hotspots from {len(all_dfs)} sensor(s).")
         return combined
             
-    def fetch_active_fires_bbox(self, west=-8.6, south=18.9, east=11.9, north=37.1, source="VIIRS_SNPP_NRT", day_range=1):
+    def fetch_active_fires_bbox(self, west=44.0, south=25.0, east=63.3, north=39.8, source="VIIRS_SNPP_NRT", day_range=1):
         """
         Fetches active fires using a spatial bounding box.
         """

@@ -50,7 +50,7 @@ CDSE_PASSWORD = get_secret("CDSE_PASSWORD", "")
 DATABASE_URL = get_secret("DATABASE_URL", "")
 
 # Path to the geojson boundary file
-GEOJSON_PATH = BASE_DIR / "algeria_forest_zone.geojson"
+GEOJSON_PATH = BASE_DIR / "iran_forest_zone.geojson"
 
 def validate_config(check_db=True, check_copernicus=True):
     """Validates that crucial environment variables are loaded."""

@@ -79,7 +79,7 @@ class WeatherClient:
                             precipitation=None, days_since_rain=None):
         """
         Calculates a custom Fire Weather Risk Index (0-100) based on local conditions.
-        Uses non-linear wind scaling, drought awareness, and Sirocco detection.
+        Uses non-linear wind scaling, drought awareness, and extreme wind detection.
         """
         if temp is None or humidity is None or wind_speed is None:
             return 50.0  # Return average risk if weather fetch failed
@@ -104,20 +104,21 @@ class WeatherClient:
             base_index = min(100.0, base_index * 1.15)
             print("[WARNING] DROUGHT MODIFIER ACTIVE: No rain in 5+ days with low humidity. Fire risk boosted.")
         
-        # 5. Sirocco Wind Check (Sirocco blows from the South/South-East, e.g., 135° to 225°)
-        is_sirocco = False
+        # 5. Extreme Wind Check: hot, dry conditions with strong winds
+        #    (Replaces North Africa-specific Sirocco with a generic extreme wind modifier)
+        is_extreme_wind = False
         if temp > 38.0 and humidity < 25.0:
-            if wind_direction is not None and (135.0 <= wind_direction <= 225.0):
-                is_sirocco = True
+            if wind_speed is not None and wind_speed > 20.0:
+                is_extreme_wind = True
                 
-        # Apply Sirocco multiplier if active (stacks with drought modifier)
-        if is_sirocco:
+        # Apply extreme wind multiplier if active (stacks with drought modifier)
+        if is_extreme_wind:
             # Boost fire risk by 30% due to highly flammable wind conditions
             risk_index = min(100.0, base_index * 1.30)
             if drought_active:
-                print("[WARNING] SIROCCO EFFECT ACTIVE (stacked with drought): Extreme fire conditions.")
+                print("[WARNING] EXTREME WIND EFFECT ACTIVE (stacked with drought): Extreme fire conditions.")
             else:
-                print("[WARNING] SIROCCO EFFECT ACTIVE: Hot, dry winds from the desert. Fire risk boosted.")
+                print("[WARNING] EXTREME WIND EFFECT ACTIVE: Hot, dry, strong winds. Fire risk boosted.")
         else:
             risk_index = base_index
             

@@ -121,7 +121,7 @@ class TelegramNotifier:
             status_text += " (False Alarm Filtered 🛡️)"
             
         msg = [
-            f"{emoji_status} <b>{title} - ALGERIA</b> {emoji_status}\n",
+            f"{emoji_status} <b>{title} - IRAN</b> {emoji_status}\n",
             f"<b>Status:</b> {status_text}",
             f"<b>Location:</b> Latitude {lat:.4f}, Longitude {lon:.4f}",
             f"<b>Fire Radiative Power (FRP):</b> {frp:.1f} MW",
@@ -141,14 +141,14 @@ class TelegramNotifier:
                 deg_lbl = f"{wind_direction:.1f}°" if wind_direction is not None else "N/A"
                 msg.append(f"• <b>Wind:</b> {wind_speed:.1f} km/h from {cardinal} ({deg_lbl})")
             
-            # Sirocco Wind check: South winds are roughly 135° to 225°
-            is_sirocco = False
+            # Extreme Wind check: hot and dry conditions with strong winds
+            is_extreme_wind = False
             if temp is not None and temp > 38 and humidity is not None and humidity < 25:
-                if wind_direction is not None and (135 <= wind_direction <= 225):
-                    is_sirocco = True
+                if wind_speed is not None and wind_speed > 20:
+                    is_extreme_wind = True
             
-            if is_sirocco:
-                msg.append("⚠️ <b>Sirocco wind effect active (Extremely dry, hot southern winds)</b>")
+            if is_extreme_wind:
+                msg.append("⚠️ <b>Extreme fire weather effect active (Hot, dry, strong winds)</b>")
                 
             if risk_score is not None:
                 risk_level = "LOW"

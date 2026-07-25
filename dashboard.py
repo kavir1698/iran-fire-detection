@@ -14,7 +14,7 @@ from src.db_client import DbClient
 
 # Page configuration
 st.set_page_config(
-    page_title="Algeria Fire Watch - منصة مراقبة الحرائق",
+    page_title="Iran Fire Watch - سامانه پایش آتش‌سوزی",
     page_icon="🔥",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -23,36 +23,36 @@ st.set_page_config(
 # ── Bilingual Translation Dictionary ──
 LANG = {
     "en": {
-        "sidebar_title": "🔥 Algeria Fire Watch",
+        "sidebar_title": "🔥 Iran Fire Watch",
         "connected": "Connected to Supabase.",
         "demo_mode": "Using simulated demo data.",
         "data_sources": "<b>Data Sources</b><br/>NASA FIRMS (VIIRS 3-sat)<br/>Copernicus Sentinel-2<br/>Open-Meteo Weather API",
         "pipeline_info": "<b>Pipeline v2</b><br/>Multi-sensor fusion<br/>DBSCAN clustering<br/>Composite scoring (0-100)",
-        "main_title": "🇩🇿 ALGERIA FOREST FIRE DETECTION PLATFORM",
+        "main_title": "🇮🇷 IRAN FOREST FIRE DETECTION PLATFORM",
         "subtitle": "Real-Time Satellite Active Fire Trigger & AI Verification Early Warning System",
         "stat_confirmed": "Active Confirmed Fires",
         "stat_pending": "Awaiting Verification",
         "stat_false": "False Alarms Filtered",
         "stat_resolved": "Resolved / Extinguished",
-        "stat_sirocco": "Active Sirocco Risks",
+        "stat_sirocco": "Extreme Wind Risks",
         "stat_visitors": "Total Visitors",
         "stat_active_visitors": "Active Visitors",
         "visitor_analytics": "Visitor Analytics",
         "map_title": "🔥 Active Fire Location Map",
 
         "filter_status": "Alert Status",
-        "filter_wilaya": "Wilaya (Province)",
+        "filter_wilaya": "Province (Ostan)",
         "filter_frp": "Min FRP (MW)",
-        "all_wilayas": "All wilayas",
+        "all_wilayas": "All provinces",
         "warnings_title": "🚨 Real-Time Warnings",
         "filter_date": "Date Range",
-        "filter_by_wilaya": "Filter by Wilaya",
+        "filter_by_wilaya": "Filter by Province",
         "no_fires": "No active fire triggers found for selected criteria.",
         "fire_confirmed": "Fire Confirmed",
         "thermal_pending": "Thermal Anomaly Awaiting Verification",
         "false_alarm": "False Alarm Filtered",
         "resolved_fire": "Resolved / Extinguished",
-        "wilaya": "Wilaya",
+        "wilaya": "Province",
         "coordinates": "Coordinates",
         "detection": "Detection",
         "risk_score": "Risk Score",
@@ -68,57 +68,57 @@ LANG = {
         "pending_lbl": "Pending Sentinel Verification",
         "false_positive_lbl": "False Positive Filtered",
         "resolved_lbl": "Resolved / Extinguished",
-        "footer": "Algeria Forest Fire detection and early warning platform. Data Source: NASA FIRMS (VIIRS/MODIS) | Copernicus Sentinel-2 | Open-Meteo.",
-        "lang_label": "Language / اللغة",
+        "footer": "Iran Forest Fire detection and early warning platform. Data Source: NASA FIRMS (VIIRS/MODIS) | Copernicus Sentinel-2 | Open-Meteo.",
+        "lang_label": "Language / زبان",
     },
-    "ar": {
-        "sidebar_title": "🔥 مراقبة حرائق الجزائر",
-        "connected": "متصل بقاعدة البيانات.",
-        "demo_mode": "وضع تجريبي — بيانات محاكاة.",
-        "data_sources": "<b>مصادر البيانات</b><br/>NASA FIRMS (3 أقمار VIIRS)<br/>Copernicus Sentinel-2<br/>Open-Meteo للطقس",
-        "pipeline_info": "<b>خط المعالجة v2</b><br/>دمج متعدد الأقمار<br/>تجميع مكاني DBSCAN<br/>تسجيل مركب (0-100)",
-        "main_title": "🇩🇿 منصة الكشف عن حرائق الغابات في الجزائر",
-        "subtitle": "نظام إنذار مبكر بالأقمار الاصطناعية والذكاء الاصطناعي",
-        "stat_confirmed": "حرائق مؤكدة نشطة",
-        "stat_pending": "في انتظار التحقق",
-        "stat_false": "إنذارات كاذبة مرشّحة",
-        "stat_resolved": "تم إخمادها",
-        "stat_sirocco": "مخاطر رياح السيروكو",
-        "stat_visitors": "إجمالي الزوار",
-        "stat_active_visitors": "الزوار الحاليون",
-        "visitor_analytics": "تحليلات الزوار",
-        "map_title": "🔥 خريطة مواقع الحرائق النشطة",
+    "fa": {
+        "sidebar_title": "🔥 پایش آتش‌سوزی ایران",
+        "connected": "متصل به پایگاه داده.",
+        "demo_mode": "حالت نمایشی — داده‌های شبیه‌سازی شده.",
+        "data_sources": "<b>منابع داده</b><br/>NASA FIRMS (3 ماهواره VIIRS)<br/>Copernicus Sentinel-2<br/>Open-Meteo هواشناسی",
+        "pipeline_info": "<b>خط پردازش v2</b><br/>ادغام چند حسگری<br/>خوشه‌بندی DBSCAN<br/>امتیازدهی ترکیبی (0-100)",
+        "main_title": "🇮🇷 سامانه پایش آتش‌سوزی جنگل‌های ایران",
+        "subtitle": "سامانه هشدار زودهنگام مبتنی بر ماهواره و هوش مصنوعی",
+        "stat_confirmed": "آتش‌سوزی‌های تأیید شده",
+        "stat_pending": "در انتظار تأیید",
+        "stat_false": "هشدارهای کذب",
+        "stat_resolved": "خاموش شده",
+        "stat_sirocco": "خطر باد شدید",
+        "stat_visitors": "کل بازدیدکنندگان",
+        "stat_active_visitors": "بازدیدکنندگان فعال",
+        "visitor_analytics": "آمار بازدید",
+        "map_title": "🔥 نقشه موقعیت آتش‌سوزی‌های فعال",
 
-        "filter_status": "حالة الإنذار",
-        "filter_wilaya": "الولاية",
-        "filter_frp": "الحد الأدنى FRP (MW)",
-        "all_wilayas": "كل الولايات",
-        "warnings_title": "🚨 الإنذارات في الوقت الفعلي",
-        "filter_date": "نطاق التاريخ",
-        "filter_by_wilaya": "تصفية حسب الولاية",
-        "no_fires": "لا توجد حرائق نشطة للمعايير المحددة.",
-        "fire_confirmed": "حريق مؤكد",
-        "thermal_pending": "شذوذ حراري في انتظار التحقق",
-        "false_alarm": "إنذار كاذب",
-        "resolved_fire": "تم إخمادها",
-        "wilaya": "الولاية",
-        "coordinates": "الإحداثيات",
-        "detection": "وقت الكشف",
-        "risk_score": "درجة الخطورة",
+        "filter_status": "وضعیت هشدار",
+        "filter_wilaya": "استان",
+        "filter_frp": "حداقل FRP (MW)",
+        "all_wilayas": "همه استان‌ها",
+        "warnings_title": "🚨 هشدارهای لحظه‌ای",
+        "filter_date": "بازه زمانی",
+        "filter_by_wilaya": "فیلتر بر اساس استان",
+        "no_fires": "آتش‌سوزی فعالی برای معیارهای انتخاب شده یافت نشد.",
+        "fire_confirmed": "آتش‌سوزی تأیید شده",
+        "thermal_pending": "ناهنجاری حرارتی در انتظار تأیید",
+        "false_alarm": "هشدار کذب",
+        "resolved_fire": "خاموش شده",
+        "wilaya": "استان",
+        "coordinates": "مختصات",
+        "detection": "زمان تشخیص",
+        "risk_score": "امتیاز خطر",
         "frp": "FRP",
-        "confidence": "الثقة",
-        "time": "الوقت",
-        "temp": "الحرارة",
-        "humidity": "الرطوبة",
-        "wind": "الرياح",
-        "risk": "الخطورة",
-        "sentinel_quicklook": "صورة Sentinel-2",
-        "confirmed_fire_lbl": "حريق غابات مؤكد",
-        "pending_lbl": "في انتظار تحقق Sentinel",
-        "false_positive_lbl": "إنذار كاذب مرشّح",
-        "resolved_lbl": "تم إخمادها",
-        "footer": "منصة الكشف عن حرائق الغابات والإنذار المبكر في الجزائر. مصادر البيانات: NASA FIRMS | Copernicus Sentinel-2 | Open-Meteo.",
-        "lang_label": "Language / اللغة",
+        "confidence": "اطمینان",
+        "time": "زمان",
+        "temp": "دما",
+        "humidity": "رطوبت",
+        "wind": "باد",
+        "risk": "خطر",
+        "sentinel_quicklook": "تصویر Sentinel-2",
+        "confirmed_fire_lbl": "آتش‌سوزی جنگلی تأیید شده",
+        "pending_lbl": "در انتظار تأیید ماهواره‌ای",
+        "false_positive_lbl": "هشدار کذب",
+        "resolved_lbl": "خاموش شده",
+        "footer": "سامانه پایش و هشدار زودهنگام آتش‌سوزی جنگل‌های ایران. منابع داده: NASA FIRMS | Copernicus Sentinel-2 | Open-Meteo.",
+        "lang_label": "Language / زبان",
     }
 }
 
@@ -126,7 +126,7 @@ LANG = {
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
-@import url('https://fonts.googleapis.com/css2?family=Noto+Kufi+Arabic:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700&display=swap');
 
 /* Main app background */
 .stApp {
@@ -134,7 +134,7 @@ st.markdown("""
     background-image: radial-gradient(circle at 10% 20%, rgba(244, 63, 94, 0.06) 0%, rgba(0, 0, 0, 0) 90%), 
                       radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.03) 0%, rgba(0, 0, 0, 0) 90%);
     color: #e2e8f0;
-    font-family: 'Outfit', 'Noto Kufi Arabic', sans-serif;
+    font-family: 'Outfit', 'Vazirmatn', sans-serif;
 }
 
 /* Sidebar styling */
@@ -193,7 +193,7 @@ section[data-testid="stSidebar"] {
 
 /* Subtitle and header formatting */
 h1, h2, h3 {
-    font-family: 'Outfit', 'Noto Kufi Arabic', sans-serif !important;
+    font-family: 'Outfit', 'Vazirmatn', sans-serif !important;
     font-weight: 700 !important;
 }
 
@@ -209,7 +209,7 @@ h1, h2, h3 {
     background: linear-gradient(90deg, #f43f5e, #f59e0b) !important;
 }
 
-/* RTL support for Arabic */
+/* RTL support for Persian */
 .rtl { direction: rtl; text-align: right; }
 </style>
 """, unsafe_allow_html=True)
@@ -220,39 +220,39 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ── Wilaya lookup ──
+# ── Province (Ostan) lookup ──
 WILAYA_BOUNDS = {
-    "Tizi Ouzou / تيزي وزو": {"lat": (36.55, 36.95), "lon": (3.70, 4.35)},
-    "Bejaia / بجاية": {"lat": (36.45, 36.85), "lon": (4.70, 5.50)},
-    "Jijel / جيجل": {"lat": (36.55, 36.90), "lon": (5.50, 6.10)},
-    "Bouira / البويرة": {"lat": (36.15, 36.60), "lon": (3.40, 4.10)},
-    "Setif / سطيف": {"lat": (35.80, 36.50), "lon": (5.00, 5.90)},
-    "Skikda / سكيكدة": {"lat": (36.60, 37.10), "lon": (6.50, 7.30)},
-    "Annaba / عنابة": {"lat": (36.60, 37.10), "lon": (7.40, 8.00)},
-    "El Tarf / الطارف": {"lat": (36.50, 37.10), "lon": (8.00, 8.70)},
-    "Medea / المدية": {"lat": (35.90, 36.45), "lon": (2.50, 3.50)},
-    "Blida / البليدة": {"lat": (36.30, 36.60), "lon": (2.60, 3.20)},
-    "Tipaza / تيبازة": {"lat": (36.40, 36.70), "lon": (1.90, 2.60)},
-    "Khenchela / خنشلة": {"lat": (35.00, 35.60), "lon": (6.90, 7.60)},
-    "Guelma / قالمة": {"lat": (36.20, 36.65), "lon": (7.00, 7.70)},
-    "Constantine / قسنطينة": {"lat": (36.20, 36.55), "lon": (6.40, 7.00)},
-    "Batna / باتنة": {"lat": (35.30, 35.80), "lon": (5.80, 6.60)},
-    "Tlemcen / تلمسان": {"lat": (34.60, 35.20), "lon": (-1.80, -1.00)},
-    "Chlef / الشلف": {"lat": (36.00, 36.50), "lon": (0.90, 1.70)},
-    "Ain Defla / عين الدفلى": {"lat": (35.90, 36.40), "lon": (1.70, 2.40)},
-    "Tissemsilt / تيسمسيلت": {"lat": (35.40, 36.00), "lon": (1.20, 2.10)},
-    "Souk Ahras / سوق أهراس": {"lat": (36.00, 36.50), "lon": (7.60, 8.30)},
-    "Mila / ميلة": {"lat": (36.10, 36.65), "lon": (5.90, 6.50)},
-    "Bordj Bou Arreridj / برج بوعريريج": {"lat": (35.80, 36.30), "lon": (4.30, 5.00)},
-    "Saida / سعيدة": {"lat": (34.50, 35.20), "lon": (0.00, 0.70)},
-    "Mascara / معسكر": {"lat": (35.10, 35.70), "lon": (-0.20, 0.60)},
-    "Relizane / غليزان": {"lat": (35.50, 36.10), "lon": (0.40, 1.20)},
-    "Mostaganem / مستغانم": {"lat": (35.70, 36.20), "lon": (0.00, 0.70)},
-    "Tiaret / تيارت": {"lat": (34.80, 35.50), "lon": (0.80, 1.80)},
-    "Oum El Bouaghi / أم البواقي": {"lat": (35.40, 36.00), "lon": (6.60, 7.50)},
-    "Naama / النعامة": {"lat": (32.20, 33.60), "lon": (-1.60, -0.20)},
-    "El Bayadh / البيض": {"lat": (32.50, 34.00), "lon": (0.00, 1.50)},
-    "Laghouat / الأغواط": {"lat": (33.20, 34.40), "lon": (2.00, 3.20)},
+    "Mazandaran / مازندران": {"lat": (35.80, 36.95), "lon": (50.50, 54.20)},
+    "Gilan / گیلان": {"lat": (36.50, 38.00), "lon": (48.50, 50.50)},
+    "Golestan / گلستان": {"lat": (36.50, 38.10), "lon": (54.00, 56.50)},
+    "Ardabil / اردبیل": {"lat": (37.20, 39.30), "lon": (47.40, 48.80)},
+    "East Azerbaijan / آذربایجان شرقی": {"lat": (37.00, 39.30), "lon": (45.50, 48.30)},
+    "West Azerbaijan / آذربایجان غربی": {"lat": (36.00, 39.30), "lon": (44.00, 47.00)},
+    "Kurdistan / کردستان": {"lat": (34.80, 36.50), "lon": (45.50, 48.20)},
+    "Kermanshah / کرمانشاه": {"lat": (33.50, 35.30), "lon": (45.50, 48.00)},
+    "Lorestan / لرستان": {"lat": (32.80, 34.50), "lon": (47.00, 50.00)},
+    "Ilam / ایلام": {"lat": (31.80, 34.00), "lon": (45.50, 48.00)},
+    "Chaharmahal & Bakhtiari / چهارمحال و بختیاری": {"lat": (31.50, 32.80), "lon": (49.50, 51.30)},
+    "Kohgiluyeh & Boyer-Ahmad / کهگیلویه و بویراحمد": {"lat": (30.30, 31.70), "lon": (50.20, 51.80)},
+    "Fars / فارس": {"lat": (28.50, 31.50), "lon": (51.00, 55.00)},
+    "North Khorasan / خراسان شمالی": {"lat": (36.50, 38.30), "lon": (56.00, 58.50)},
+    "Razavi Khorasan / خراسان رضوی": {"lat": (34.00, 37.50), "lon": (56.50, 61.50)},
+    "Semnan / سمنان": {"lat": (34.50, 37.30), "lon": (52.00, 57.00)},
+    "Tehran / تهران": {"lat": (35.30, 36.40), "lon": (50.70, 52.00)},
+    "Alborz / البرز": {"lat": (35.70, 36.30), "lon": (50.50, 51.50)},
+    "Qazvin / قزوین": {"lat": (35.60, 36.80), "lon": (48.80, 50.60)},
+    "Zanjan / زنجان": {"lat": (35.60, 37.30), "lon": (47.10, 49.50)},
+    "Hamadan / همدان": {"lat": (34.20, 35.70), "lon": (47.70, 49.50)},
+    "Markazi / مرکزی": {"lat": (33.60, 35.50), "lon": (48.50, 51.00)},
+    "Isfahan / اصفهان": {"lat": (31.00, 34.50), "lon": (50.00, 55.50)},
+    "Yazd / یزد": {"lat": (29.50, 34.00), "lon": (52.50, 58.00)},
+    "Kerman / کرمان": {"lat": (26.50, 31.50), "lon": (54.50, 60.00)},
+    "Hormozgan / هرمزگان": {"lat": (25.50, 28.50), "lon": (52.50, 59.50)},
+    "Bushehr / بوشهر": {"lat": (27.20, 30.30), "lon": (50.00, 53.00)},
+    "Khuzestan / خوزستان": {"lat": (29.50, 33.00), "lon": (47.50, 51.00)},
+    "Sistan & Baluchestan / سیستان و بلوچستان": {"lat": (25.00, 31.50), "lon": (58.50, 63.30)},
+    "South Khorasan / خراسان جنوبی": {"lat": (31.00, 34.50), "lon": (56.50, 61.00)},
+    "Qom / قم": {"lat": (34.20, 35.20), "lon": (50.20, 51.70)},
 }
 
 
@@ -261,33 +261,33 @@ def get_wilaya(lat, lon):
         if bounds["lat"][0] <= lat <= bounds["lat"][1] and bounds["lon"][0] <= lon <= bounds["lon"][1]:
             return name
     if lat > 36.0:
-        return "Northern Tell Atlas / أطلس التل"
-    elif lat > 34.0:
-        return "Hauts Plateaux / الهضاب العليا"
+        return "Alborz Range / رشته کوه البرز"
+    elif lat > 32.0:
+        return "Zagros Mountains / رشته کوه زاگرس"
     else:
-        return "Saharan Atlas / الأطلس الصحراوي"
+        return "Southern Iran / جنوب ایران"
 
 # ── Mock Data ──
 def get_mock_data():
     now = datetime.now(timezone.utc)
     return [
-        {"id": 1, "latitude": 36.712, "longitude": 4.045, "frp": 124.5, "confidence": 92,
+        {"id": 1, "latitude": 36.712, "longitude": 51.420, "frp": 124.5, "confidence": 92,
          "acquisition_time": now - timedelta(hours=2), "status": "CONFIRMED", "temp": 41.2,
          "humidity": 14.5, "wind_speed": 32.4, "wind_direction": 185.0, "risk_score": 94.0,
          "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 2, "latitude": 36.758, "longitude": 5.081, "frp": 68.2, "confidence": 78,
+        {"id": 2, "latitude": 37.258, "longitude": 49.581, "frp": 68.2, "confidence": 78,
          "acquisition_time": now - timedelta(hours=4), "status": "CONFIRMED", "temp": 39.5,
          "humidity": 18.0, "wind_speed": 22.0, "wind_direction": 170.0, "risk_score": 82.0,
          "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 3, "latitude": 36.802, "longitude": 5.761, "frp": 25.1, "confidence": 62,
+        {"id": 3, "latitude": 36.802, "longitude": 54.461, "frp": 25.1, "confidence": 62,
          "acquisition_time": now - timedelta(minutes=45), "status": "PENDING", "temp": 38.0,
          "humidity": 21.0, "wind_speed": 18.5, "wind_direction": 110.0, "risk_score": 45.0,
          "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 4, "latitude": 36.425, "longitude": 2.871, "frp": 12.4, "confidence": 55,
+        {"id": 4, "latitude": 33.425, "longitude": 48.271, "frp": 12.4, "confidence": 55,
          "acquisition_time": now - timedelta(hours=10), "status": "FALSE_POSITIVE", "temp": 36.8,
          "humidity": 24.5, "wind_speed": 12.0, "wind_direction": 90.0, "risk_score": 28.0,
          "product_id": None, "quicklook_url": None, "telegram_message_id": None},
-        {"id": 5, "latitude": 36.650, "longitude": 3.90, "frp": 85.0, "confidence": 88,
+        {"id": 5, "latitude": 36.650, "longitude": 51.590, "frp": 85.0, "confidence": 88,
          "acquisition_time": now - timedelta(days=2), "status": "RESOLVED", "temp": 40.0,
          "humidity": 16.0, "wind_speed": 25.0, "wind_direction": 190.0, "risk_score": 90.0,
          "product_id": None, "quicklook_url": None, "telegram_message_id": None},
@@ -394,10 +394,10 @@ total_visitors, active_visitors = tracker.track(st.session_state["session_id"])
 
 
 # ── Sidebar with Language Toggle ──
-lang_choice = st.sidebar.radio("Language / اللغة", ["English", "العربية"], index=0, key="lang_toggle", horizontal=True)
-lang = "ar" if lang_choice == "العربية" else "en"
+lang_choice = st.sidebar.radio("Language / زبان", ["English", "فارسی"], index=0, key="lang_toggle", horizontal=True)
+lang = "fa" if lang_choice == "فارسی" else "en"
 t = LANG[lang]
-text_dir = "rtl" if lang == "ar" else "ltr"
+text_dir = "rtl" if lang == "fa" else "ltr"
 
 st.sidebar.markdown(f"<h2 style='text-align: center;'>{t['sidebar_title']}</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
@@ -444,12 +444,12 @@ false_positives = len(df[df["status"] == "FALSE_POSITIVE"]) if not df.empty else
 resolved_fires = len(df[df["status"] == "RESOLVED"]) if not df.empty else 0
 
 sirocco_regions = 0
-if not df.empty and "temp" in df.columns and "wind_direction" in df.columns:
+if not df.empty and "temp" in df.columns and "wind_speed" in df.columns:
     active_df = df[df["status"].isin(["CONFIRMED", "PENDING"])]
     sirocco_regions = len(active_df[
         (active_df["temp"] > 38) & 
-        (active_df["wind_direction"] >= 135) & 
-        (active_df["wind_direction"] <= 225)
+        (active_df["humidity"] < 25) &
+        (active_df["wind_speed"] > 20)
     ]) if not active_df.empty else 0
 
 with col1:
@@ -503,35 +503,35 @@ with col6:
 
 # ── Citizen Crowdsource Verification Form (Top Placement) ──
 st.markdown("---")
-st.subheader("📢 Ground Verification & Citizen Fire Report / الإبلاغ عن حريق ميداني")
+st.subheader("📢 Ground Verification & Citizen Fire Report / گزارش میدانی آتش‌سوزی")
 st.markdown("<p style='color: #94a3b8; font-size: 14px;'>Report an active fire or confirm a satellite detection. Photo proof is mandatory for verification.</p>", unsafe_allow_html=True)
 
-with st.expander("📝 Submit Ground Verification Report / تقديم بلاغ عن حريق", expanded=True):
+with st.expander("📝 Submit Ground Verification Report / ثبت گزارش میدانی", expanded=True):
     cform_col1, cform_col2 = st.columns(2)
     
     with cform_col1:
         reporter_type = st.selectbox(
-            "Reporter Category / صفة المبلّغ",
-            ["Local Citizen / مواطن", "Forest Ranger / حارس غابات", "Civil Protection / الحماية المدنية"],
+            "Reporter Category / نوع گزارش‌دهنده",
+            ["Local Citizen / شهروند", "Forest Ranger / محیط‌بان", "Fire Department / آتش‌نشانی"],
             key="cit_reporter_type"
         )
-        reporter_name = st.text_input("Reporter Name / Name / اسم المبلّغ (Optional)", value="", key="cit_reporter_name")
+        reporter_name = st.text_input("Reporter Name / نام گزارش‌دهنده (Optional)", value="", key="cit_reporter_name")
         severity = st.selectbox(
-            "Fire Severity / مستوى الخطورة",
-            ["Active Smoke Plume / دخان كثيف", "Visible Flames Spreading / ألسنة نيران", "Extinguished / تم الإخماد"],
+            "Fire Severity / شدت آتش‌سوزی",
+            ["Active Smoke Plume / دود فعال", "Visible Flames Spreading / شعله‌های قابل مشاهده", "Extinguished / خاموش شده"],
             key="cit_severity"
         )
 
     with cform_col2:
         loc_method = st.radio(
-            "Location Input Method / طريقة تحديد الموقع",
-            ["GPS Auto-Detect / تحديد آلي", "Wilaya & Manual Coordinates / اختيار الولاية والإحداثيات"],
+            "Location Input Method / روش تعیین موقعیت",
+            ["GPS Auto-Detect / تشخیص خودکار", "Province & Manual Coordinates / انتخاب استان و مختصات"],
             key="cit_loc_method"
         )
         
         rep_lat = 36.5
-        rep_lon = 4.0
-        selected_wilaya_name = "Tizi Ouzou / تيزي وزو"
+        rep_lon = 51.5
+        selected_wilaya_name = "Mazandaran / مازندران"
         
         if loc_method.startswith("GPS"):
             st.markdown("📍 *GPS Auto-Detect Active:* Using browser geolocation or default station coordinates.")
@@ -558,31 +558,31 @@ with st.expander("📝 Submit Ground Verification Report / تقديم بلاغ �
                 </script>
             </div>
             """, height=45)
-            rep_lat = st.number_input("Latitude / خط العرض", value=36.7120, format="%.4f", key="cit_gps_lat")
-            rep_lon = st.number_input("Longitude / خط الطول", value=4.0450, format="%.4f", key="cit_gps_lon")
+            rep_lat = st.number_input("Latitude / عرض جغرافیایی", value=36.7120, format="%.4f", key="cit_gps_lat")
+            rep_lon = st.number_input("Longitude / طول جغرافیایی", value=51.4200, format="%.4f", key="cit_gps_lon")
         else:
             all_wilaya_keys = list(WILAYA_BOUNDS.keys())
-            selected_wilaya_name = st.selectbox("Select Wilaya / اختر الولاية", options=all_wilaya_keys, key="cit_wilaya_select")
+            selected_wilaya_name = st.selectbox("Select Province / انتخاب استان", options=all_wilaya_keys, key="cit_wilaya_select")
             bounds = WILAYA_BOUNDS[selected_wilaya_name]
             default_lat = (bounds["lat"][0] + bounds["lat"][1]) / 2.0
             default_lon = (bounds["lon"][0] + bounds["lon"][1]) / 2.0
-            rep_lat = st.number_input("Latitude / خط العرض", value=default_lat, format="%.4f", key="cit_man_lat")
-            rep_lon = st.number_input("Longitude / خط الطول", value=default_lon, format="%.4f", key="cit_man_lon")
+            rep_lat = st.number_input("Latitude / عرض جغرافیایی", value=default_lat, format="%.4f", key="cit_man_lat")
+            rep_lon = st.number_input("Longitude / طول جغرافیایی", value=default_lon, format="%.4f", key="cit_man_lon")
 
-    description = st.text_area("Description & Notes / تفاصيل إضافية", placeholder="E.g., Smoke plume visible near forest boundary moving North...", key="cit_desc")
+    description = st.text_area("Description & Notes / توضیحات", placeholder="E.g., Smoke plume visible near forest boundary moving North...", key="cit_desc")
     
     st.markdown("---")
-    st.markdown("📷 **Mandatory Photo Proof / إثبات بالصورة (إجباري)**")
+    st.markdown("📷 **Mandatory Photo Proof / تصویر (الزامی)**")
     
     pcol1, pcol2 = st.columns(2)
     with pcol1:
-        uploaded_file = st.file_uploader("Upload Photo File / تحميل صورة", type=["jpg", "jpeg", "png"], key="cit_file")
+        uploaded_file = st.file_uploader("Upload Photo File / بارگذاری تصویر", type=["jpg", "jpeg", "png"], key="cit_file")
     with pcol2:
-        camera_file = st.camera_input("Take Snapshot with Camera / التقاط صورة live", key="cit_cam")
+        camera_file = st.camera_input("Take Snapshot with Camera / عکس با دوربین", key="cit_cam")
         
     final_photo = uploaded_file or camera_file
     
-    if st.button("🚀 Submit Fire Report / إرسال البلاغ", key="cit_submit_btn"):
+    if st.button("🚀 Submit Fire Report / ارسال گزارش", key="cit_submit_btn"):
         if not final_photo:
             st.error("⚠️ **OBLIGATORY FIELD MISSING:** You must upload a photo or take a camera snapshot to submit a ground verification report!")
         else:
@@ -601,11 +601,11 @@ with st.expander("📝 Submit Ground Verification Report / تقديم بلاغ �
                     "severity": severity.split("/")[0].strip(),
                     "description": description,
                     "photo_b64": photo_uri,
-                    "verified": True if "Ranger" in reporter_type or "Civil" in reporter_type else False
+                    "verified": True if "Ranger" in reporter_type or "Fire" in reporter_type else False
                 }
                 
                 report_id = db_client.save_citizen_report(report_payload)
-                st.success(f"✅ Fire report submitted successfully! Report ID: {report_id or 'SAVED'}. Thank you for helping protect Algerian forests.")
+                st.success(f"✅ Fire report submitted successfully! Report ID: {report_id or 'SAVED'}. Thank you for helping protect Iranian forests.")
             except Exception as e:
                 st.error(f"Failed to record report: {e}")
 
@@ -659,8 +659,8 @@ else:
     df_filtered = pd.DataFrame()
 
 # ── Full-Width Map ──
-map_center = [35.5, 4.0]
-zoom_start = 7
+map_center = [32.0, 53.5]
+zoom_start = 6
 if not df_filtered.empty:
     df_sorted = df_filtered.sort_values(by="acquisition_time", ascending=False)
     latest_row = df_sorted.iloc[0]
@@ -677,7 +677,7 @@ if GEOJSON_PATH.exists():
             geojson_data = json.load(f)
         folium.GeoJson(
             geojson_data,
-            name="Forest Hazard Risk Zone",
+            name="Iran Forest Hazard Risk Zone",
             style_function=lambda x: {
                 "fillColor": "#10b981", "color": "#059669",
                 "weight": 2, "fillOpacity": 0.05
@@ -702,7 +702,7 @@ if not df_filtered.empty:
         wilaya_name = row.get("wilaya", "Unknown")
 
         popup_html = f"""
-        <div style="font-family: 'Outfit', 'Noto Kufi Arabic', sans-serif; width: 230px; color:#1e293b;">
+        <div style="font-family: 'Outfit', 'Vazirmatn', sans-serif; width: 230px; color:#1e293b;">
             <h4 style="margin: 0 0 6px 0; color:#b91c1c;">{status_lbl}</h4>
             <hr style="margin: 4px 0 6px 0; border: 0; border-top:1px solid #cbd5e1;"/>
             <b>{t['wilaya']}:</b> {wilaya_name}<br/>

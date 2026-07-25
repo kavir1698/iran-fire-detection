@@ -44,7 +44,7 @@ class SpatialFilter:
     def is_in_forest_zone(self, lat, lon):
         """
         Check if a given latitude and longitude is inside the northern forest/park zone.
-        Filters out southern Sahara gas flaring points.
+        Filters out non-forest areas (deserts, urban zones, industrial sites).
         """
         # Coordinate type & NaN validation
         if lat is None or lon is None:
@@ -57,16 +57,15 @@ class SpatialFilter:
         if math.isnan(lat) or math.isnan(lon):
             return False
             
-        # Hard check: All Algerian forest zones and national parks are strictly north of 32.0° N.
-        # This quickly eliminates Hassi Messaoud (31.68° N), In Amenas (28.03° N).
-        # Hassi R'Mel (32.93° N) is handled by the precise GeoJSON polygon exclusion.
-        if lat < 32.0:
+        # Hard check: Iran's forest zones (Hyrcanian, Zagros, Arasbaran) are generally north of 25.0° N
+        # and between 44.0° E and 63.3° E.
+        if lat < 25.0:
             return False
             
         if self.gdf is None:
             # Fallback: simple bounding box if GeoJSON loading failed
             print("[WARNING] GeoJSON boundary not loaded. Using fallback bounding box.")
-            return 32.0 <= lat <= 37.5 and -2.5 <= lon <= 9.0
+            return 25.0 <= lat <= 39.8 and 44.0 <= lon <= 63.3
             
         try:
             point = Point(lon, lat)  # Shapely Point uses (longitude, latitude) / (x, y)

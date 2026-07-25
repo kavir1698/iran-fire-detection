@@ -1,4 +1,4 @@
-name: Algeria Forest Fire Detection Pipeline
+name: Iran Forest Fire Detection Pipeline
 
 on:
   schedule:

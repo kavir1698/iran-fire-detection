@@ -1,6 +1,6 @@
-# Algeria Forest Fire Detection Platform 🇩🇿🔥
+# Iran Forest Fire Detection Platform 🇮🇷🔥
 
-A real-time forest fire early warning system for Algeria, powered by NASA satellite data, AI-driven smoke verification, and automated Telegram alerts. Built for **zero-budget deployability** using entirely open data sources.
+A real-time forest fire early warning system for Iran, powered by NASA satellite data, AI-driven smoke verification, and automated Telegram alerts. Built for **zero-budget deployability** using entirely open data sources.
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-Dashboard-FF4B4B?logo=streamlit&logoColor=white)
@@ -9,14 +9,14 @@ A real-time forest fire early warning system for Algeria, powered by NASA satell
 
 ## 🌍 Overview
 
-Algeria suffers devastating forest fires every summer, particularly across the Tell Atlas mountain range (Tizi Ouzou, Béjaïa, Jijel, Skikda). This platform provides **autonomous fire detection and alerting** by:
+Iran loses thousands of hectares of forest to wildfires every summer, particularly across the Hyrcanian Caspian forests (Mazandaran, Gilan, Golestan), the Zagros oak forests, and the Arasbaran region. This platform provides **autonomous fire detection and alerting** by:
 
 1. **Ingesting** active fire hotspots from **3 NASA VIIRS satellites** (SNPP, NOAA-20, NOAA-21) via FIRMS API
 2. **Clustering** spatially proximate detections using DBSCAN to group hotspots into discrete fire events
 3. **Verifying** each cluster against **Copernicus Sentinel-2** optical imagery with a computer-vision smoke detector
 4. **Enriching** with live weather data (temperature, humidity, wind, drought index) from Open-Meteo
 5. **Scoring** each fire with a weighted composite confidence metric (0–100)
-6. **Alerting** via Telegram with annotated satellite imagery, weather context, and Sirocco wind warnings
+6. **Alerting** via Telegram with annotated satellite imagery, weather context, and extreme wind warnings
 7. **Visualizing** on a real-time Streamlit dashboard with interactive Leaflet maps
 
 ## 🏗️ Architecture
@@ -69,12 +69,12 @@ Algeria suffers devastating forest fires every summer, particularly across the T
 | **DBSCAN Clustering** | Groups nearby hotspots into discrete fire events (O(n log n) spatial indexing) |
 | **CV Smoke Detection** | Computer-vision heuristic analyzes Sentinel-2 imagery for smoke plume signatures |
 | **Composite Scoring** | Weighted confidence metric (FRP, cluster size, multi-sensor confirmation, weather risk, smoke detection) |
-| **Sirocco Wind Detection** | Identifies dangerous Saharan wind conditions (hot, dry, southerly winds) that accelerate fire spread |
+| **Extreme Wind Detection** | Identifies dangerous fire weather conditions (hot, dry, strong winds) that accelerate fire spread |
 | **Drought Modifier** | Boosts fire risk scores when no precipitation has occurred for 5+ days |
 | **Notification Dedup** | 6-hour cooldown prevents duplicate Telegram alerts for the same fire |
 | **PENDING → CONFIRMED** | Intelligently upgrades existing records instead of creating duplicates |
-| **Wilaya Mapping** | Reverse-geocodes fire coordinates to Algerian provinces (wilayas) |
-| **Real-Time Dashboard** | Interactive Leaflet map with status, wilaya, FRP, and date filters |
+| **Province Mapping** | Reverse-geocodes fire coordinates to Iranian provinces (ostans) |
+| **Real-Time Dashboard** | Interactive Leaflet map with status, province, FRP, and date filters |
 
 ## 🚀 Quick Start
 
@@ -90,8 +90,8 @@ Algeria suffers devastating forest fires every summer, particularly across the T
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/algeria-fire-detection.git
-cd algeria-fire-detection
+git clone https://github.com/YOUR_USERNAME/iran-fire-detection.git
+cd iran-fire-detection
 
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
@@ -158,12 +158,12 @@ These constants in `pipeline.py` control the sensitivity of the detection engine
 ## 📁 Project Structure
 
 ```
-algeria-fire-detection/
+iran-fire-detection/
 ├── pipeline.py                  # Main detection pipeline orchestrator
 ├── dashboard.py                 # Streamlit real-time dashboard
 ├── schema.sql                   # PostgreSQL/PostGIS database schema
 ├── requirements.txt             # Python dependencies
-├── algeria_forest_zone.geojson  # Forest boundary overlay for map
+├── iran_forest_zone.geojson     # Forest boundary overlay for map
 ├── .env.example                 # Environment variable template
 ├── .github/
 │   └── workflows/
@@ -176,7 +176,8 @@ algeria-fire-detection/
 │   ├── smoke_detector.py        # CV-based smoke plume analysis
 │   ├── spatial_filter.py        # Geospatial forest boundary filter
 │   ├── db_client.py             # PostgreSQL/PostGIS database client
-│   └── telegram_notifier.py     # Telegram alert dispatcher
+│   ├── telegram_notifier.py     # Telegram alert dispatcher
+│   └── social_verifier.py       # Citizen crowdsource verification
 ├── migrations/
 │   ├── migration_v2.sql         # Schema migration for v2 columns
 │   └── add_detection_columns.py # Python migration script
@@ -210,6 +211,16 @@ The included `.github/workflows/fire_detection_cron.yml` runs the pipeline every
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS active fire hotspots (3 satellites) | Free |
 | [Copernicus CDSE](https://dataspace.copernicus.eu/) | Sentinel-2 L2A optical imagery | Free |
 | [Open-Meteo](https://open-meteo.com/) | Temperature, humidity, wind, precipitation | Free |
+
+## 🌲 Iran's Forest Regions
+
+The system monitors Iran's three major forest ecosystems:
+
+| Region | Provinces | Forest Type |
+|---|---|---|
+| **Hyrcanian (Caspian)** | Gilan, Mazandaran, Golestan | Temperate broadleaf, UNESCO World Heritage |
+| **Zagros** | Kurdistan, Kermanshah, Lorestan, Ilam, Fars, Kohgiluyeh | Oak-dominant mountain forests |
+| **Arasbaran** | East Azerbaijan, Ardabil | Caucasian-mixed mountain forests |
 
 ## 📄 License
 

@@ -125,7 +125,7 @@ class SmokeDetector:
                             if img is not None:
                                 img_hud = self._draw_ai_overlay(
                                     img, 
-                                    "ALGERIA FIRE WATCH | YOLOv8 ANALYZER", 
+                                    "IRAN FIRE WATCH | YOLOv8 ANALYZER", 
                                     f"STATUS: SMOKE PLUME CONFIRMED ({best_conf:.2%})", 
                                     (50, 255, 50)  # Green
                                 )
@@ -145,7 +145,7 @@ class SmokeDetector:
                         if img is not None:
                             img_hud = self._draw_ai_overlay(
                                 img, 
-                                "ALGERIA FIRE WATCH | YOLOv8 ANALYZER", 
+                                "IRAN FIRE WATCH | YOLOv8 ANALYZER", 
                                 "STATUS: NO SMOKE DETECTED BY AI MODEL", 
                                 (140, 140, 140)  # Gray
                             )
@@ -211,7 +211,7 @@ class SmokeDetector:
                 # Apply overlay with mask highlights in orange
                 img_hud = self._draw_ai_overlay(
                     img, 
-                    "ALGERIA FIRE WATCH | CV ANALYZER", 
+                    "IRAN FIRE WATCH | CV ANALYZER", 
                     f"STATUS: SMOKE HAZE DETECTED ({confidence:.2%})", 
                     (0, 165, 255),  # Orange
                     smoke_mask=smoke_mask
@@ -232,7 +232,7 @@ class SmokeDetector:
                 # Apply unconfirmed overlay but still show highlight blocks for the "AI look"
                 img_hud = self._draw_ai_overlay(
                     img, 
-                    "ALGERIA FIRE WATCH | CV ANALYZER", 
+                    "IRAN FIRE WATCH | CV ANALYZER", 
                     status_lbl, 
                     status_color,
                     smoke_mask=smoke_mask if smoke_ratio > 0 else None

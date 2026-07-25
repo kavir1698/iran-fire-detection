@@ -22,13 +22,13 @@ def test_spatial_filter_invalid_coordinates():
     assert sf.is_in_forest_zone(float('nan'), 4.0) is False
     assert sf.is_in_forest_zone(36.0, float('nan')) is False
     
-    # Test points clearly below the 32.0 degree latitude cutoff (Sahara exclusion)
-    assert sf.is_in_forest_zone(31.5, 3.0) is False
-    assert sf.is_in_forest_zone(28.0, 1.5) is False
+    # Test points clearly below the 25.0 degree latitude cutoff (outside Iran forest zones)
+    assert sf.is_in_forest_zone(24.5, 53.0) is False
+    assert sf.is_in_forest_zone(20.0, 50.0) is False
 
 def test_spatial_filter_valid_string_coercion():
     sf = SpatialFilter()
-    assert sf.is_in_forest_zone("31.0", "4.0") is False
+    assert sf.is_in_forest_zone("24.0", "53.0") is False
 
 def test_fire_risk_calculations():
     wc = WeatherClient()
@@ -40,34 +40,35 @@ def test_fire_risk_calculations():
     risk = wc.calculate_fire_risk(25.0, 50.0, 15.0, 90.0)
     assert 20.0 <= risk <= 50.0
 
-def test_sirocco_multiplier_boost():
+def test_extreme_wind_multiplier_boost():
     wc = WeatherClient()
-    risk_sirocco = wc.calculate_fire_risk(40.0, 15.0, 20.0, 180.0)
-    risk_normal = wc.calculate_fire_risk(40.0, 15.0, 20.0, 90.0)
-    
-    assert risk_sirocco > risk_normal
-    assert math.isclose(risk_sirocco, min(100.0, risk_normal * 1.3), rel_tol=1e-2)
+    # With extreme wind (temp > 38, humidity < 25, wind_speed > 20)
+    risk_extreme = wc.calculate_fire_risk(40.0, 15.0, 25.0, 180.0)
+    # Same conditions but without extreme wind multiplier (wind_speed <= 20)
+    risk_no_wind = wc.calculate_fire_risk(40.0, 15.0, 15.0, 180.0)
+
+    assert risk_extreme > risk_no_wind
 
 def test_social_verifier_keyword_matching():
     sv = SocialVerifier()
-    assert sv.is_fire_related_text("اندلاع حريق مهول بجيجل") is True
-    assert sv.is_fire_related_text("Un incendie de forêt s'est déclaré près de Tizi Ouzou") is True
-    assert sv.is_fire_related_text("Weather report for Algiers today") is False
+    assert sv.is_fire_related_text("آتش‌سوزی در جنگل‌های مازندران گزارش شد") is True
+    assert sv.is_fire_related_text("A wildfire has been reported near Gilan province") is True
+    assert sv.is_fire_related_text("Rain and cloudy skies expected tomorrow") is False
 
 def test_social_verifier_spatial_temporal_matching():
     sv = SocialVerifier()
     now = datetime.now(timezone.utc)
     
-    hotspot_lat, hotspot_lon = 36.712, 4.045
+    hotspot_lat, hotspot_lon = 36.712, 51.420
     hotspot_time = now
     
     reports = [
         # Match within 2km and 1 hour
-        {"id": 1, "latitude": 36.715, "longitude": 4.048, "reporter_type": "Citizen", "created_at": now - timedelta(minutes=30)},
+        {"id": 1, "latitude": 36.715, "longitude": 51.423, "reporter_type": "Citizen", "created_at": now - timedelta(minutes=30)},
         # Too far (> 20km)
-        {"id": 2, "latitude": 37.000, "longitude": 4.500, "reporter_type": "Citizen", "created_at": now},
+        {"id": 2, "latitude": 37.000, "longitude": 52.500, "reporter_type": "Citizen", "created_at": now},
         # Too old (> 5 hours)
-        {"id": 3, "latitude": 36.712, "longitude": 4.045, "reporter_type": "Forest Ranger", "created_at": now - timedelta(hours=6)},
+        {"id": 3, "latitude": 36.712, "longitude": 51.420, "reporter_type": "Forest Ranger", "created_at": now - timedelta(hours=6)},
     ]
     
     matches = sv.match_reports_with_hotspot(hotspot_lat, hotspot_lon, hotspot_time, reports, max_dist_km=10.0, max_hours=3.0)
@@ -108,9 +109,9 @@ def test_telegram_notifier_cardinals():
 
 def test_dbscan_clustering():
     hotspots = [
-        {"latitude": 36.712, "longitude": 4.045, "acq_date": "2026-07-21", "acq_time": "1200"},
-        {"latitude": 36.715, "longitude": 4.048, "acq_date": "2026-07-21", "acq_time": "1205"}, # Close
-        {"latitude": 37.500, "longitude": 6.000, "acq_date": "2026-07-21", "acq_time": "1200"}, # Far
+        {"latitude": 36.712, "longitude": 51.420, "acq_date": "2026-07-21", "acq_time": "1200"},
+        {"latitude": 36.715, "longitude": 51.423, "acq_date": "2026-07-21", "acq_time": "1205"}, # Close
+        {"latitude": 37.500, "longitude": 56.000, "acq_date": "2026-07-21", "acq_time": "1200"}, # Far
     ]
     clusters = cluster_hotspots(hotspots)
     assert clusters[0][0] == clusters[1][0]  # Same cluster

@@ -278,7 +278,7 @@ def count_multi_sensor_detections(hotspot, all_hotspots):
 
 def run_pipeline():
     logger.info("=================================================================")
-    logger.info("ALGERIA FIRE WATCH PIPELINE START (v2 — Multi-Sensor + DBSCAN)")
+    logger.info("IRAN FIRE WATCH PIPELINE START (v2 — Multi-Sensor + DBSCAN)")
     logger.info("=================================================================")
 
     notifier = TelegramNotifier()
@@ -320,7 +320,7 @@ def run_pipeline():
             raise RuntimeError("Failed to fetch active fires from NASA FIRMS API after maximum retry attempts.")
             
         if df.empty:
-            logger.info("No active thermal hotspots detected in Algeria in the last 24 hours. Pipeline finished.")
+            logger.info("No active thermal hotspots detected in Iran in the last 24 hours. Pipeline finished.")
             return
 
         logger.info(f"Total hotspots from all sensors: {len(df)}")
@@ -665,7 +665,7 @@ def run_pipeline():
         
         # Operational Telegram Failure Alert
         err_msg = (
-            f"🚨 <b>ALGERIA FIRE WATCH PIPELINE FAILURE DETECTED</b> 🚨\n\n"
+            f"🚨 <b>IRAN FIRE WATCH PIPELINE FAILURE DETECTED</b> 🚨\n\n"
             f"<b>Error Type:</b> <code>{type(e).__name__}</code>\n"
             f"<b>Error Details:</b> <code>{html.escape(str(e))}</code>\n\n"
             f"⚠️ <i>Please inspect the execution log on the deployment environment for full traceback details.</i>"
