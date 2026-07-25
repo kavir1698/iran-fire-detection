@@ -97,49 +97,70 @@ class TelegramNotifier:
         arr = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"]
         return arr[val % 16]
 
+    @staticmethod
+    def get_wind_direction_cardinal_fa(deg):
+        """Converts wind degrees to Persian cardinal directions."""
+        if deg is None:
+            return "نامشخص"
+        deg = deg % 360
+        val = int((deg / 22.5) + 0.5)
+        arr = ["شمال", "شمال-شمال شرقی", "شمال شرقی", "شرق-شمال شرقی",
+               "شرق", "شرق-جنوب شرقی", "جنوب شرقی", "جنوب-جنوب شرقی",
+               "جنوب", "جنوب-جنوب غربی", "جنوب غربی", "غرب-جنوب غربی",
+               "غرب", "غرب-شمال غربی", "شمال غربی", "شمال-شمال غربی"]
+        return arr[val % 16]
+
     def format_fire_alert(self, lat, lon, frp, confidence, acq_time, status, 
                            temp=None, humidity=None, wind_speed=None, wind_direction=None, 
                            risk_score=None, is_update=False, bypass_reason=None):
-        """Formats the fire metrics into a beautiful HTML string for Telegram."""
+        """Formats the fire metrics into a bilingual (Persian/English) HTML string for Telegram."""
         
         # Escape dynamic string parameters to avoid HTML entity parsing errors in Telegram API
         status = html.escape(str(status))
         acq_time = html.escape(str(acq_time))
         
         emoji_status = "🔥" if status == "CONFIRMED" else "⚠️"
-        title = "ONGOING ACTIVE FIRE UPDATE" if is_update else "NEW FOREST FIRE DETECTED"
         
-        status_text = f"<b>{status}</b>"
+        # Persian translations
+        status_fa = {"CONFIRMED": "تأیید شده", "PENDING": "در انتظار تأیید",
+                     "FALSE_POSITIVE": "هشدار کذب", "RESOLVED": "خاموش شده"}.get(status, status)
+        
+        title_en = "ONGOING ACTIVE FIRE UPDATE" if is_update else "NEW FOREST FIRE DETECTED"
+        title_fa = "به‌روزرسانی آتش‌سوزی فعال" if is_update else "آتش‌سوزی جدید در جنگل شناسایی شد"
+        
+        # Status detail text
+        status_detail = f"<b>{status_fa} | {status}</b>"
         if status == "CONFIRMED":
             if bypass_reason:
-                status_text += " (Auto-Confirmed by FRP/Cluster ⚡)"
+                status_detail += " (تأیید خودکار | Auto-Confirmed by FRP/Cluster ⚡)"
             else:
-                status_text += " (Smoke Plume Verified 💨)"
+                status_detail += " (تأیید توسط دود | Smoke Plume Verified 💨)"
         elif status == "PENDING":
-            status_text += " (Awaiting Satellite Verification ⏳)"
+            status_detail += " (در انتظار تأیید ماهواره‌ای | Awaiting Satellite Verification ⏳)"
         elif status == "FALSE_POSITIVE":
-            status_text += " (False Alarm Filtered 🛡️)"
+            status_detail += " (فیلتر هشدار کذب | False Alarm Filtered 🛡️)"
             
         msg = [
-            f"{emoji_status} <b>{title} - IRAN</b> {emoji_status}\n",
-            f"<b>Status:</b> {status_text}",
-            f"<b>Location:</b> Latitude {lat:.4f}, Longitude {lon:.4f}",
-            f"<b>Fire Radiative Power (FRP):</b> {frp:.1f} MW",
-            f"<b>Satellite Confidence:</b> {confidence}%",
-            f"<b>Detection Time:</b> {acq_time}\n"
+            f"{emoji_status} <b>{title_fa} | {title_en} — ایران 🇮🇷</b> {emoji_status}\n",
+            f"<b>وضعیت | Status:</b> {status_detail}",
+            f"<b>موقعیت | Location:</b> {lat:.4f}, {lon:.4f}",
+            f"<b>توان تابشی | FRP:</b> {frp:.1f} MW",
+            f"<b>اطمینان ماهواره | Confidence:</b> {confidence}%",
+            f"<b>زمان تشخیص | Detection:</b> {acq_time}\n"
         ]
         
         # Add Weather parameters if available
         if temp is not None or humidity is not None or wind_speed is not None:
-            msg.append("🌤️ <b>Local Weather & Risk Assessment:</b>")
+            msg.append("🌤️ <b>شرایط جوی | Weather & Risk Assessment:</b>")
             if temp is not None:
-                msg.append(f"• <b>Temperature:</b> {temp:.1f}°C")
+                msg.append(f"• <b>دما | Temp:</b> {temp:.1f}°C")
             if humidity is not None:
-                msg.append(f"• <b>Relative Humidity:</b> {humidity:.1f}%")
+                msg.append(f"• <b>رطوبت | Humidity:</b> {humidity:.1f}%")
             if wind_speed is not None:
-                cardinal = self.get_wind_direction_cardinal(wind_direction)
+                cardinal_en = self.get_wind_direction_cardinal(wind_direction)
+                cardinal_fa = self.get_wind_direction_cardinal_fa(wind_direction)
                 deg_lbl = f"{wind_direction:.1f}°" if wind_direction is not None else "N/A"
-                msg.append(f"• <b>Wind:</b> {wind_speed:.1f} km/h from {cardinal} ({deg_lbl})")
+                msg.append(f"• <b>باد | Wind:</b> {wind_speed:.1f} km/h از {cardinal_fa} | from {cardinal_en} ({deg_lbl})")
             
             # Extreme Wind check: hot and dry conditions with strong winds
             is_extreme_wind = False
@@ -148,23 +169,27 @@ class TelegramNotifier:
                     is_extreme_wind = True
             
             if is_extreme_wind:
-                msg.append("⚠️ <b>Extreme fire weather effect active (Hot, dry, strong winds)</b>")
+                msg.append("⚠️ <b>هشدار باد شدید و خشک | Extreme fire weather — hot, dry, strong winds</b>")
                 
             if risk_score is not None:
-                risk_level = "LOW"
+                risk_level_en = "LOW"
+                risk_level_fa = "کم"
                 if risk_score >= 80:
-                    risk_level = "EXTREME 🚨"
+                    risk_level_en = "EXTREME 🚨"
+                    risk_level_fa = "بسیار زیاد 🚨"
                 elif risk_score >= 50:
-                    risk_level = "HIGH ⚠️"
+                    risk_level_en = "HIGH ⚠️"
+                    risk_level_fa = "زیاد ⚠️"
                 elif risk_score >= 25:
-                    risk_level = "MODERATE"
-                msg.append(f"• <b>Fire Weather Risk:</b> {risk_score:.0f}/100 ({risk_level})")
+                    risk_level_en = "MODERATE"
+                    risk_level_fa = "متوسط"
+                msg.append(f"• <b>خطر آتش‌سوزی | Fire Risk:</b> {risk_score:.0f}/100 ({risk_level_fa} | {risk_level_en})")
             
             msg.append("") # newline
             
         if bypass_reason:
             msg.append(f"{bypass_reason}\n")
             
-        msg.append(f"📍 <a href='https://www.google.com/maps/search/?api=1&query={lat},{lon}'>Open in Google Maps</a>")
+        msg.append(f"📍 <a href='https://www.google.com/maps/search/?api=1&query={lat},{lon}'>مشاهده در Google Maps | Open in Google Maps</a>")
         
         return "\n".join(msg)
