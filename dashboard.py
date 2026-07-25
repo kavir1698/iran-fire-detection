@@ -11,6 +11,7 @@ import folium
 import streamlit.components.v1 as components
 from src.config import GEOJSON_PATH
 from src.db_client import DbClient
+from src.spatial_filter import SpatialFilter
 
 # Page configuration
 st.set_page_config(
@@ -318,6 +319,11 @@ if db_client.db_url and "change-me" not in db_client.db_url:
 
 if not db_configured:
     fires = get_mock_data()
+
+spatial = SpatialFilter()
+fires = [f for f in fires if spatial.is_in_forest_zone(
+    float(f.get("latitude", 0)), float(f.get("longitude", 0))
+)]
 
 df = pd.DataFrame(fires)
 
