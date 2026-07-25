@@ -317,7 +317,8 @@ def run_pipeline():
             time.sleep(backoff ** attempt)
             
         if df is None:
-            raise RuntimeError("Failed to fetch active fires from NASA FIRMS API after maximum retry attempts.")
+            logger.warning("NASA FIRMS API unreachable after all retries (intermittent network from GitHub Actions runner). Skipping this run — will retry on next cron tick.")
+            return
             
         if df.empty:
             logger.info("No active thermal hotspots detected in Iran in the last 24 hours. Pipeline finished.")
