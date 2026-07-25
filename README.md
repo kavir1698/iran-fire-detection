@@ -76,18 +76,13 @@ Iran loses thousands of hectares of forest to wildfires every summer, particular
 | **Province Mapping** | Reverse-geocodes fire coordinates to Iranian provinces (ostans) |
 | **Real-Time Dashboard** | Interactive Leaflet map with status, province, FRP, and date filters |
 
-## 🚀 Quick Start
+## 🚀 Setup Guide
 
-### Prerequisites
+All data sources and services are free. Total cost to run: **$0/month**.
 
-- Python 3.10+
-- PostgreSQL with PostGIS extension (or [Supabase](https://supabase.com/) free tier)
-- API keys (all free):
-  - [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/api/area/) API key
-  - [Telegram Bot](https://core.telegram.org/bots#botfather) token + channel ID
-  - [Copernicus CDSE](https://dataspace.copernicus.eu/) account
+### 1. Fork the Repository
 
-### 1. Clone & Install
+Click **Fork** on GitHub, then clone your fork:
 
 ```bash
 git clone https://github.com/YOUR_USERNAME/iran-fire-detection.git
@@ -95,38 +90,100 @@ cd iran-fire-detection
 
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment
+### 2. Get a Telegram Bot Token & Chat ID
+
+1. Open Telegram, search for **@BotFather**, send `/newbot`
+2. Choose a name and username for your bot. You'll receive an **HTTP API token** (e.g. `716819396:AAHP0...`). Save it.
+3. Create a **Telegram channel** (e.g. `@IranFireAlerts`) and add your bot as an **administrator**.
+4. Send a test message to the channel, then visit this URL in your browser:
+   ```
+   https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates
+   ```
+5. Look for `"chat":{"id":-100...}` and copy the numeric ID (e.g. `-1003728633967`).
+
+### 3. Create a Supabase Database
+
+1. Sign up at [supabase.com](https://supabase.com) → **New project**
+2. Choose a name (e.g. `iran-fire-watch`), generate a **database password**, and pick a region close to Iran (e.g. Frankfurt).
+3. Wait for provisioning, then go to **Settings** → **Database** → **Connection string** → **URI** tab.
+4. Copy the string and replace `[YOUR-PASSWORD]` with your database password:
+   ```
+   postgresql://postgres:YOURPASSWORD@db.xxxxxx.supabase.co:5432/postgres
+   ```
+5. Create the tables by running this command (uses your `.env` from step 5):
+   ```bash
+   python -c "import psycopg2, os; from dotenv import load_dotenv; load_dotenv(); conn = psycopg2.connect(os.getenv('DATABASE_URL')); cur = conn.cursor(); cur.execute(open('schema.sql').read()); conn.commit(); print('Tables created')"
+   ```
+   If the hostname doesn't resolve (common on some networks), use the **Transaction pooler** connection string (port 6543) in your local `.env` instead.
+
+### 4. Get a NASA FIRMS API Key
+
+1. Visit [firms.modaps.eosdis.nasa.gov/api/map_key/](https://firms.modaps.eosdis.nasa.gov/api/map_key/)
+2. Enter your name and email. NASA emails you the key instantly.
+3. Save the key.
+
+### 5. Get Copernicus CDSE Credentials
+
+1. Sign up at [dataspace.copernicus.eu](https://dataspace.copernicus.eu/)
+2. Use your email as the username and the password you set during registration. **Do not check** the "Copernicus Contributing Missions" box — standard Sentinel-2 access is all you need.
+
+### 6. Configure .env
+
+Copy the template and fill in all values:
 
 ```bash
 cp .env.example .env
-# Edit .env with your API keys and database URL
 ```
 
-### 3. Initialize Database
+Your `.env` should look like:
 
-Run the schema against your PostgreSQL/Supabase instance:
-
-```bash
-psql $DATABASE_URL -f schema.sql
+```env
+NASA_FIRMS_KEY=your_nasa_firms_key
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=-1001111111111
+CDSE_USERNAME=you@email.com
+CDSE_PASSWORD=your_copernicus_password
+DATABASE_URL=postgresql://postgres:YOURPASSWORD@db.xxxxxx.supabase.co:5432/postgres
 ```
 
-### 4. Run the Pipeline
+### 7. Configure GitHub Secrets
 
-```bash
-python pipeline.py
-```
+Go to your GitHub repo → **Settings** → **Secrets and variables** → **Actions** → add all 6 as **New repository secret**:
 
-### 5. Launch the Dashboard
+| Secret | Value |
+|---|---|
+| `NASA_FIRMS_KEY` | Your NASA FIRMS key |
+| `TELEGRAM_BOT_TOKEN` | Your Telegram bot token |
+| `TELEGRAM_CHAT_ID` | Your channel numeric ID (e.g. `-1003728633967`) |
+| `CDSE_USERNAME` | Your Copernicus email |
+| `CDSE_PASSWORD` | Your Copernicus password |
+| `DATABASE_URL` | The **direct connection** URI (port 5432), not the pooler |
 
-```bash
-streamlit run dashboard.py
-```
+### 8. Enable GitHub Actions
 
-Open `http://localhost:8501` to view the real-time map and warnings.
+GitHub disables Actions on forked repos by default:
+
+1. Go to your repo → **Actions** tab
+2. Click **"Iran Forest Fire Detection Pipeline"**
+3. Click the **"Enable workflow"** button
+4. Click **"Run workflow"** → **"Run workflow"** to trigger the first run immediately
+
+The pipeline now runs automatically every 30 minutes, 24/7, at zero cost.
+
+### 9. Deploy the Live Dashboard (Optional)
+
+1. Push your repo to GitHub
+2. Go to [share.streamlit.io](https://share.streamlit.io), connect your GitHub account
+3. Select this repo, set the main file to `dashboard.py`
+4. In the Streamlit Cloud dashboard → **Settings** → **Secrets**, paste all 6 key-value pairs from your `.env` (in TOML format, e.g. `NASA_FIRMS_KEY = "your_key"`)
+5. Your dashboard will be live at `https://<app-name>.streamlit.app`
+
+### 10. Train a Custom Smoke Detection Model (Optional)
+
+The pipeline includes a CV fallback for smoke detection. For better accuracy, train a YOLOv8 model using the Jupyter notebook in `notebooks/smoke_detection_training.ipynb` on Kaggle or Google Colab (free GPU). Place the resulting `model.pt` file in the project root and the pipeline automatically uses it.
 
 ## ⚙️ Configuration
 
