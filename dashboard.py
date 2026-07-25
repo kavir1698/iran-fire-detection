@@ -464,7 +464,7 @@ class _VisitorTracker:
                 return data.get("total_visitors", 0), data.get("active_sessions", {})
         except Exception:
             pass
-        return 1285, {}
+        return 0, {}
 
     @staticmethod
     def _save(total: int, sessions: dict):
@@ -505,7 +505,7 @@ TOTAL_VISITORS, ACTIVE_VISITORS = visitor.track(st.session_state["session_id"])
 # ═══════════════════════════════════════════════════════════════
 lang_choice = st.sidebar.radio(
     "Language / زبان", ["English", "فارسی"],
-    index=0, key="lang_toggle", horizontal=True,
+    index=1, key="lang_toggle", horizontal=True,
 )
 lang = "fa" if lang_choice == "فارسی" else "en"
 t = T[lang]
@@ -645,28 +645,34 @@ STATUS_MAP = {
     "FALSE_POSITIVE":  ("⚪", t["false_alarm"]),
     "RESOLVED":        ("🟢", t["resolved_fire"]),
 }
-STATUS_LABEL_TO_KEY = {v[1]: k for k, (ico, v) in STATUS_MAP.items()}
 
 f1, f2, f3 = st.columns([2, 2, 1])
 
 with f1:
     selected_labels = st.multiselect(
         t["filter_status"],
-        options=[v[1] for v in STATUS_MAP.values()],
-        default=[STATUS_MAP["CONFIRMED"][1], STATUS_MAP["PENDING"][1]],
-        key="map_status",
+        options=[f"{ico} {lbl}" for ico, lbl in STATUS_MAP.values()],
+        default=[f"{STATUS_MAP['CONFIRMED'][0]} {STATUS_MAP['CONFIRMED'][1]}",
+                 f"{STATUS_MAP['PENDING'][0]} {STATUS_MAP['PENDING'][1]}"],
+        key="map_status_v3",
     )
-    status_filter = [STATUS_LABEL_TO_KEY[lb] for lb in selected_labels if lb in STATUS_LABEL_TO_KEY]
+    # Strip emoji prefix to get the bare translated label, then map to status code
+    status_filter = []
+    for lb in selected_labels:
+        for status_code, (ico, lbl) in STATUS_MAP.items():
+            if lb == f"{ico} {lbl}":
+                status_filter.append(status_code)
+                break
 
 with f2:
     available_provinces = sorted(df["province"].dropna().unique().tolist()) if not df.empty and "province" in df.columns else []
     province_filter = st.multiselect(
         t["filter_province"], options=available_provinces,
-        default=[], key="map_province", placeholder=t["filter_all"],
+        default=[], key="map_province_v3", placeholder=t["filter_all"],
     )
 
 with f3:
-    min_frp = st.slider(t["filter_frp"], 0.0, 300.0, 0.0, 10.0, key="map_frp")
+    min_frp = st.slider(t["filter_frp"], 0.0, 300.0, 0.0, 10.0, key="map_frp_v3")
 
 # Apply filters
 if not df.empty:
