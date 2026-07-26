@@ -26,6 +26,7 @@
     {"name": "Flare 23", "latitude": 38.648115, "longitude": 54.282652},
     {"name": "Flare 24", "latitude": 35.628928, "longitude": 44.008875},
     {"name": "Flare 25", "latitude": 35.486934, "longitude": 44.154590},
-    {"name": "Flare 26", "latitude": 27.759008, "longitude": 52.167831}
+    {"name": "Flare 26", "latitude": 27.759008, "longitude": 52.167831},
+    {"name": "Asaluye", "latitude": 27.480101, "longitude": 52.621455}
   ]
 }
