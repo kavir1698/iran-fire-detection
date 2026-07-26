@@ -34,6 +34,8 @@
     {"name": "Flare 27, Marun 3", "latitude": 31.135768, "longitude": 49.319158},
     {"name": "Flare 28, Marun 6", "latitude": 31.301063, "longitude": 49.119048},
     {"name": "Flare 29", "latitude": 30.573811, "longitude": 49.918848 },
-    {"name": "Flare 30", "latitude": 30.563008, "longitude": 50.015818}
+    {"name": "Flare 30", "latitude": 30.563008, "longitude": 50.015818},
+    {"name": "Flare 31", "latitude": 31.209958, "longitude": 49.216213},
+    {"name": "Flare 32", "latitude": 32.368185, "longitude": 47.405913}
   ]
 }
