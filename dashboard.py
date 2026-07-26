@@ -74,6 +74,7 @@ T = {
         "wind": "Wind",
         "risk": "Fire Risk",
         "sentinel_quicklook": "Sentinel-2 Quicklook",
+        "open_in_google_maps": "Open in Google Maps",
         "footer": "Iran Forest Fire detection & early-warning platform. Data: NASA FIRMS (VIIRS/MODIS) | Copernicus Sentinel-2 | Open‑Meteo.",
         "verification_title": "Ground Verification & Citizen Fire Report",
         "verification_subtitle": "Report an active fire or confirm a satellite detection. Photo proof is mandatory.",
@@ -137,6 +138,7 @@ T = {
         "wind": "باد",
         "risk": "خطر",
         "sentinel_quicklook": "تصویر Sentinel-2",
+        "open_in_google_maps": "مشاهده در Google Maps",
         "footer": "سامانه پایش و هشدار زودهنگام آتش‌سوزی جنگل‌های ایران. منابع داده: NASA FIRMS | Copernicus Sentinel-2 | Open‑Meteo.",
         "verification_title": "گزارش میدانی و تأیید آتش‌سوزی",
         "verification_subtitle": "گزارش آتش‌سوزی فعال یا تأیید تشخیص ماهواره‌ای. تصویر الزامی است.",
@@ -757,6 +759,7 @@ for _, row in df_map.iterrows():
         <hr style="margin:4px 0;border:0;border-top:1px solid #cbd5e1;">
         <b>{t['province']}:</b> {prov}<br>
         <b>{t['coordinates']}:</b> {row['latitude']:.4f}, {row['longitude']:.4f}<br>
+        <a href="https://www.google.com/maps?q={row['latitude']:.6f},{row['longitude']:.6f}" target="_blank" style="color:#3b82f6;font-size:12px;text-decoration:none;">{t.get('open_in_google_maps', 'Open in Google Maps')}</a><br>
         <b>{t['frp']}:</b> {row['frp']:.1f} MW<br>
         <b>{t['confidence']}:</b> {row['confidence']}%<br>
         <b>{t['time']}:</b> {tm}<br>
