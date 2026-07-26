@@ -473,6 +473,39 @@ class DbClient:
         finally:
             self._release_connection(conn)
 
+    def cleanup_resolved_fires(self, days=30):
+        """Deletes RESOLVED fires older than the given number of days."""
+        if not self.db_url or "change-me" in self.db_url:
+            return 0
+
+        conn = None
+        try:
+            conn = self._get_connection()
+            query = """
+                DELETE FROM fires
+                WHERE status = 'RESOLVED'
+                  AND updated_at < NOW() - %s::interval
+                RETURNING id;
+            """
+            with conn.cursor() as cur:
+                cur.execute(query, (f"{days} days",))
+                deleted_ids = cur.fetchall()
+            conn.commit()
+            count = len(deleted_ids)
+            if count > 0:
+                logger.info(f"Cleaned up {count} resolved fires older than {days} days.")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to cleanup resolved fires: {e}")
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            return 0
+        finally:
+            self._release_connection(conn)
+
     def get_all_fires(self, limit=200):
         """
         Fetches fire data for dashboard display.

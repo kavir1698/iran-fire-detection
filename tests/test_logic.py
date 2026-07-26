@@ -11,6 +11,7 @@ from src.weather_client import WeatherClient
 from src.social_verifier import SocialVerifier
 from src.telegram_notifier import TelegramNotifier
 from src.flare_filter import FlareFilter
+from src.db_client import DbClient
 from pipeline import compute_composite_score, parse_firms_time, parse_confidence, cluster_hotspots
 from download_model import validate_url, SOURCES
 
@@ -311,3 +312,84 @@ class TestSmokeDetectorDownload:
             with mock.patch("src.smoke_detector.SMOKE_MODEL_URL", ""):
                 detector = SmokeDetector()
                 assert detector.model is not None
+
+
+class TestDbClientCleanup:
+    TEST_DB_URL = "postgresql://test:test@localhost:5432/testdb"
+
+    def _make_mock_conn(self, fetchall_return=None, autocommit=False):
+        mock_cursor = mock.MagicMock()
+        mock_cursor.fetchall.return_value = fetchall_return or []
+        mock_conn = mock.MagicMock()
+        mock_conn.cursor.return_value.__enter__.return_value = mock_cursor
+        mock_conn.cursor.return_value.__exit__.return_value = None
+        return mock_conn, mock_cursor
+
+    def test_cleanup_skips_when_db_not_configured(self):
+        db = DbClient(db_url="")
+        assert db.cleanup_resolved_fires(days=30) == 0
+
+        db2 = DbClient(db_url="postgresql://user:change-me@localhost/db")
+        assert db2.cleanup_resolved_fires(days=30) == 0
+
+    def test_cleanup_deletes_resolved_older_than_days(self):
+        with mock.patch.object(DbClient, "_get_connection") as mock_get_conn:
+            mock_conn, mock_cursor = self._make_mock_conn(
+                fetchall_return=[(1,), (2,), (3,)]
+            )
+            mock_get_conn.return_value = mock_conn
+
+            db = DbClient(db_url=self.TEST_DB_URL)
+            count = db.cleanup_resolved_fires(days=30)
+
+            assert count == 3
+            mock_conn.commit.assert_called_once()
+            mock_cursor.execute.assert_called_once()
+            sql, params = mock_cursor.execute.call_args[0]
+            assert "DELETE FROM fires" in sql
+            assert "status = 'RESOLVED'" in sql
+            assert isinstance(params, tuple)
+
+    def test_cleanup_does_not_delete_non_resolved(self):
+        with mock.patch.object(DbClient, "_get_connection") as mock_get_conn:
+            mock_conn, mock_cursor = self._make_mock_conn(fetchall_return=[])
+            mock_get_conn.return_value = mock_conn
+
+            db = DbClient(db_url=self.TEST_DB_URL)
+            count = db.cleanup_resolved_fires(days=30)
+
+            assert count == 0
+            mock_conn.commit.assert_called_once()
+
+    def test_cleanup_handles_exception_gracefully(self):
+        with mock.patch.object(DbClient, "_get_connection") as mock_get_conn:
+            mock_conn = mock.MagicMock()
+            mock_conn.cursor.side_effect = Exception("connection lost")
+            mock_get_conn.return_value = mock_conn
+
+            db = DbClient(db_url=self.TEST_DB_URL)
+            count = db.cleanup_resolved_fires(days=30)
+
+            assert count == 0
+
+    def test_cleanup_uses_custom_days_parameter(self):
+        with mock.patch.object(DbClient, "_get_connection") as mock_get_conn:
+            mock_conn, mock_cursor = self._make_mock_conn()
+            mock_get_conn.return_value = mock_conn
+
+            db = DbClient(db_url=self.TEST_DB_URL)
+            db.cleanup_resolved_fires(days=90)
+
+            sql, params = mock_cursor.execute.call_args[0]
+            assert "90 days" in params[0]
+
+    def test_cleanup_default_is_30_days(self):
+        with mock.patch.object(DbClient, "_get_connection") as mock_get_conn:
+            mock_conn, mock_cursor = self._make_mock_conn()
+            mock_get_conn.return_value = mock_conn
+
+            db = DbClient(db_url=self.TEST_DB_URL)
+            db.cleanup_resolved_fires()
+
+            sql, params = mock_cursor.execute.call_args[0]
+            assert "30 days" in params[0]

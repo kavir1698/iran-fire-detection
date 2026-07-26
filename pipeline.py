@@ -360,6 +360,9 @@ def run_pipeline():
         # Auto-resolve fires that haven't been re-detected in 24 hours
         db.resolve_old_fires(hours=24)
 
+        # Clean up resolved fires older than 30 days
+        db.cleanup_resolved_fires(days=30)
+
         # Process each forest hotspot
         processed_count = 0
         alerts_triggered = 0
