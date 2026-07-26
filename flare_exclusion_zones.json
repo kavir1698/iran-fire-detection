@@ -27,6 +27,11 @@
     {"name": "Flare 24", "latitude": 35.628928, "longitude": 44.008875},
     {"name": "Flare 25", "latitude": 35.486934, "longitude": 44.154590},
     {"name": "Flare 26", "latitude": 27.759008, "longitude": 52.167831},
-    {"name": "Asaluye", "latitude": 27.480101, "longitude": 52.621455}
+    {"name": "Asaluye", "latitude": 27.480101, "longitude": 52.621455},
+    {"name": "Mobarake Steel Factory", "latitude": 32.240467, "longitude": 51.427760},
+    {"name": "Ahvaz Petroleum", "latitude": 31.308025, "longitude": 48.771342},
+    {"name": "Behbahan Gas Plant", "latitude": 30.348596, "longitude": 50.290863},
+    {"name": "Flare 27, Marun 3", "latitude": 31.135768, "longitude": 49.319158},
+    {"name": "Flare 28, Marun 6", "latitude": 31.301063, "longitude": 49.119048}
   ]
 }
