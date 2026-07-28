@@ -71,13 +71,16 @@ ALTER TABLE citizen_reports ENABLE ROW LEVEL SECURITY;
 
 -- Trigger to automatically populate the geom column based on latitude/longitude
 CREATE OR REPLACE FUNCTION update_fires_geom()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+SET search_path = pg_catalog, pg_temp
+LANGUAGE plpgsql
+AS $$
 BEGIN
     NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326)::geography;
     NEW.updated_at := NOW();
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 DROP TRIGGER IF EXISTS trg_update_fires_geom ON fires;
 CREATE TRIGGER trg_update_fires_geom
