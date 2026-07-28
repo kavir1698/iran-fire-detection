@@ -64,6 +64,11 @@ CREATE TABLE IF NOT EXISTS citizen_reports (
 CREATE INDEX IF NOT EXISTS idx_citizen_reports_coords ON citizen_reports(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_citizen_reports_created ON citizen_reports(created_at DESC);
 
+-- Enable Row-Level Security on all public tables
+-- Direct psycopg2 connections bypass RLS; this blocks the Supabase REST API only
+ALTER TABLE fires ENABLE ROW LEVEL SECURITY;
+ALTER TABLE citizen_reports ENABLE ROW LEVEL SECURITY;
+
 -- Trigger to automatically populate the geom column based on latitude/longitude
 CREATE OR REPLACE FUNCTION update_fires_geom()
 RETURNS TRIGGER AS $$
