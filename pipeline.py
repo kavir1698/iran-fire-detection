@@ -320,10 +320,12 @@ def run_pipeline():
             
         if df is None:
             logger.warning("NASA FIRMS API unreachable after all retries (intermittent network from GitHub Actions runner). Skipping this run — will retry on next cron tick.")
+            logger.warning("Fire cleanup was not run because FIRMS returned no usable response.")
             return
             
         if df.empty:
             logger.info("No active thermal hotspots detected in Iran in the last 24 hours. Pipeline finished.")
+            logger.warning("Fire cleanup was not run because FIRMS returned an empty result.")
             return
 
         logger.info(f"Total hotspots from all sensors: {len(df)}")
@@ -346,6 +348,7 @@ def run_pipeline():
 
         if not forest_hotspots:
             logger.info("No active thermal hotspots found inside the forest hazard zones. Pipeline finished.")
+            logger.warning("Fire cleanup was not run because no FIRMS hotspots survived forest/flare filtering.")
             return
 
         logger.info(f"Found {len(forest_hotspots)} forest hotspots from {len(set(h.get('source','?') for h in forest_hotspots))} sensor(s). Running DBSCAN clustering...")
@@ -358,10 +361,12 @@ def run_pipeline():
         logger.info(f"Cluster analysis complete: {n_clustered} of {n_total} hotspots belong to active clusters.")
 
         # Auto-resolve fires that haven't been re-detected in 24 hours
-        db.resolve_old_fires(hours=24)
+        resolved_count = db.resolve_old_fires(hours=24)
+        logger.info(f"Cleanup diagnostic: resolve_old_fires changed {resolved_count} row(s).")
 
         # Clean up resolved fires older than 30 days
-        db.cleanup_resolved_fires(days=30)
+        deleted_count = db.cleanup_resolved_fires(days=30)
+        logger.info(f"Cleanup diagnostic: cleanup_resolved_fires deleted {deleted_count} row(s).")
 
         # Process each forest hotspot
         processed_count = 0

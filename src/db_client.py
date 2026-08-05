@@ -1,6 +1,6 @@
 import math
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 from psycopg2.extras import RealDictCursor
@@ -531,6 +531,23 @@ class DbClient:
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(query, (limit,))
                 result = cur.fetchall()
+            if result:
+                active = [
+                    row for row in result
+                    if row.get("status") in ("CONFIRMED", "PENDING")
+                    and row.get("acquisition_time") is not None
+                ]
+                oldest = min(row["acquisition_time"] for row in result)
+                stale_active = sum(
+                    1 for row in active
+                    if row["acquisition_time"] < datetime.now(timezone.utc) - timedelta(hours=24)
+                )
+                logger.info(
+                    "Dashboard fire query diagnostic: returned=%d oldest=%s stale_active_over_24h=%d",
+                    len(result), oldest, stale_active,
+                )
+            else:
+                logger.info("Dashboard fire query diagnostic: returned=0")
             return result
         except Exception as e:
             logger.error(f"Failed to query fires from database: {e}")

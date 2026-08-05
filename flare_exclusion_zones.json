@@ -40,6 +40,11 @@
     {"name": "Bandar Abbas Oil Refinery", "latitude": 27.167807, "longitude": 56.052656},
     {"name": "Flare 33", "latitude": 30.922268, "longitude": 48.856498},
     {"name": "Hoveize oil refinary", "latitude": 31.161059, "longitude": 48.058197},
-    {"name": "Flare 34", "latitude": 31.251882, "longitude": 49.171420}
+    {"name": "Flare 34", "latitude": 31.251882, "longitude": 49.171420},
+    {"name": "Flare 35", "latitude": 30.892332, "longitude": 49.611877},
+    {"name": "Flare 36", "latitude": 30.721275, "longitude": 49.822218},
+    {"name": "Flare 37", "latitude": 30.709751, "longitude": 49.541063},
+    {"name": "Flare 38", "latitude": 31.238031, "longitude": 48.994168}
+  ],
   ]
 }
