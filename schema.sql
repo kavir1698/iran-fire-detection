@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS fires (
     frp DOUBLE PRECISION NOT NULL,  -- Fire Radiative Power (MW)
     confidence INTEGER NOT NULL,  -- Confidence percentage
     acquisition_time TIMESTAMP WITH TIME ZONE NOT NULL,
-    status VARCHAR(50) DEFAULT 'PENDING' CONSTRAINT chk_status CHECK (status IN ('PENDING', 'CONFIRMED', 'FALSE_POSITIVE')),
+    status VARCHAR(50) DEFAULT 'PENDING' CONSTRAINT chk_status CHECK (status IN ('PENDING', 'CONFIRMED', 'FALSE_POSITIVE', 'RESOLVED')),
     source VARCHAR(20) DEFAULT 'VIIRS_SNPP_NRT' NOT NULL,
     temp DOUBLE PRECISION,  -- Local temperature at detection time
     humidity DOUBLE PRECISION,  -- Local relative humidity at detection time
