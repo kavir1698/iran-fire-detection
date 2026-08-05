@@ -6,7 +6,6 @@ Real-time satellite active-fire detection & AI verification platform.
 import base64
 import json
 import logging
-import re
 import time
 import uuid
 from datetime import datetime, time as dt_time, timezone, timedelta
@@ -15,7 +14,6 @@ from pathlib import Path
 import folium
 import pandas as pd
 import streamlit as st
-import streamlit.components.v1 as components
 
 from src.config import GEOJSON_PATH
 from src.db_client import DbClient
@@ -806,8 +804,7 @@ for _, row in df_map.iterrows():
     ).add_to(m)
 
 map_html = m._repr_html_()  # type: ignore[attr-defined]
-map_html = re.sub(r'(?<!\\)\\([0-9])', r'\\\\\1', map_html)
-components.html(map_html, height=620, scrolling=False)
+st.iframe(map_html, height=620)
 
 # ═══════════════════════════════════════════════════════════════
 # WARNINGS
@@ -906,7 +903,7 @@ with st.expander("📝 " + t["submit_report"], expanded=False):
                 f"<span style='font-size:13px;color:var(--emerald);' class='{dir_cls}'>📍 GPS Auto‑Detect Active</span>",
                 unsafe_allow_html=True,
             )
-            components.html("""
+            st.iframe("""
             <div style="font-family:system-ui,sans-serif;font-size:12px;color:var(--emerald);margin:4px 0 12px;">
                 <button onclick="getLocation()" style="background:#10b981;color:white;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-weight:600;">
                     🎯 Fetch GPS
