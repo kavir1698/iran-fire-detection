@@ -5,6 +5,9 @@ pandas>=2.1.0
 ultralytics>=8.1.0
 psycopg2-binary>=2.9.9
 streamlit>=1.30.0
+# streamlit 1.61's bundled gzip middleware crashes with starlette>=1.4
+# (GZipResponder requires a new thread_minimum_size kwarg). Keep <1.4.
+starlette>=0.46.0,<1.4
 folium>=0.15.0
 streamlit-folium>=0.18.0
 python-dotenv>=1.0.0
