@@ -70,13 +70,16 @@ ALTER TABLE fires ENABLE ROW LEVEL SECURITY;
 ALTER TABLE citizen_reports ENABLE ROW LEVEL SECURITY;
 
 -- Trigger to automatically populate the geom column based on latitude/longitude
+-- NOTE: search_path stays locked to pg_catalog, pg_temp for security (v5).
+-- PostGIS functions/types must therefore be schema-qualified (public.) or they
+-- cannot be resolved inside this function and every INSERT/UPDATE on fires fails.
 CREATE OR REPLACE FUNCTION update_fires_geom()
 RETURNS TRIGGER
 SET search_path = pg_catalog, pg_temp
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    NEW.geom := ST_SetSRID(ST_MakePoint(NEW.longitude, NEW.latitude), 4326)::geography;
+    NEW.geom := public.ST_SetSRID(public.ST_MakePoint(NEW.longitude, NEW.latitude), 4326)::public.geography;
     NEW.updated_at := NOW();
     RETURN NEW;
 END;
