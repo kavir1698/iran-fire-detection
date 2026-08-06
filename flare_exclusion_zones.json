@@ -46,6 +46,7 @@
     {"name": "Flare 37", "latitude": 30.709751, "longitude": 49.541063},
     {"name": "Flare 38", "latitude": 31.238031, "longitude": 48.994168},
     {"name": "Flare 39", "latitude": 30.298997,  "longitude": 50.741650},
-    {"name": "Flare 40", "latitude": 32.178284, "longitude": 47.520512}
+    {"name": "Flare 40", "latitude": 32.178284, "longitude": 47.520512},
+    {"name": "Flare 41", "latitude": 27.583386, "longitude": 52.539039}
   ]
 }
