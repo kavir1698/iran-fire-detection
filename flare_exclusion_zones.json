@@ -48,6 +48,10 @@
     {"name": "Flare 39", "latitude": 30.298997,  "longitude": 50.741650},
     {"name": "Flare 40", "latitude": 32.178284, "longitude": 47.520512},
     {"name": "Flare 41", "latitude": 27.583386, "longitude": 52.539039},
-    {"name": "Flare 42", "latitude": 31.405317, "longitude": 48.652511}
+    {"name": "Flare 42", "latitude": 31.405317, "longitude": 48.652511},
+    {"name": "Flare 43", "latitude": 33.717540, "longitude": 46.295817},
+    {"name": "Flare 44", "latitude": 30.394594, "longitude": 50.609900},
+    {"name": "Flare 45", "latitude": 30.393530, "longitude": 50.611305},
+    {"name": "Flare 46", "latitude": 32.117592, "longitude": 47.410049}
   ]
 }
