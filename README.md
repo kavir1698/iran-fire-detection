@@ -173,6 +173,8 @@ GitHub disables Actions on forked repos by default:
 
 The pipeline now runs automatically every 30 minutes, 24/7, at zero cost.
 
+> ⚠️ **Keep the pipeline active:** GitHub automatically disables scheduled workflows on inactive repositories, so a commit must be pushed at least once every 60 days for the pipeline to keep running.
+
 ### 9. Deploy the Live Dashboard (Optional)
 
 1. Push your repo to GitHub
