@@ -19,6 +19,45 @@ Iran loses thousands of hectares of forest to wildfires every summer, particular
 6. **Alerting** via Telegram with annotated satellite imagery, weather context, and extreme wind warnings
 7. **Visualizing** on a real-time Streamlit dashboard with interactive Leaflet maps
 
+> **Live dashboard:** deploy your own in ~5 minutes via [Streamlit Cloud](#9-deploy-the-live-dashboard-optional) — no server, no cost.
+
+## 🔎 How It Works
+
+Each pipeline run (every 30 minutes) executes the following stages:
+
+1. **Fetch** — Pull the last 24 h of VIIRS hotspots for Iran from all three sensors (SNPP, NOAA-20, NOAA-21) via the FIRMS area API.
+2. **Filter** — Drop hotspots below the confidence gate, outside the forest hazard zones (`iran_forest_zone.geojson`), or within a known gas-flare exclusion radius (`flare_exclusion_zones.json`).
+3. **Cluster** — Group the remaining hotspots with DBSCAN (2 km radius, 2 h time window) into discrete fire events.
+4. **Enrich** — Fetch live weather from Open-Meteo and compute a fire-weather risk index (temperature, humidity, wind, drought modifier, extreme-wind flag).
+5. **Verify** — Download the latest cloud-free Sentinel-2 L2A scene over the cluster and run the YOLOv8 smoke detector (or the CV heuristic fallback).
+6. **Score** — Combine every signal into a composite confidence score (0–100).
+7. **Persist & Alert** — Write the fire to PostGIS, upgrade or deduplicate existing records, and push a Telegram alert with annotated imagery when the fire is CONFIRMED.
+8. **Housekeeping** — Auto-resolve fires not re-detected within 24 h and delete RESOLVED records older than 30 days.
+
+### Composite Confidence Score
+
+The score is the sum of independent signal weights, capped at 100:
+
+| Signal | Max points | Notes |
+|---|---|---|
+| Thermal energy (FRP) | 30 | `min(30, FRP × 0.5)` — saturates at 60 MW |
+| VIIRS confidence | 15 | Scaled from the sensor's confidence percentage |
+| Spatial clustering | 15 | `min(15, 5 + cluster_size × 2)` |
+| Fire-weather risk | 15 | Scaled from the Open-Meteo risk index |
+| Smoke detection | 15 | `smoke_confidence × 15` |
+| Nighttime detection | 5 | Fewer false positives without sun glint |
+| Multi-sensor agreement | 10 | +3 for one other sensor, +10 for two or more |
+| Citizen/social reports | 15 | Bonus from `social_verifier.py` |
+
+### Fire Status Lifecycle
+
+| Status | Meaning |
+|---|---|
+| `PENDING` | Composite score 35–64 — plausible but unverified; re-evaluated on later passes |
+| `CONFIRMED` | Composite score ≥ 65 — Telegram alert sent (subject to the 6 h cooldown) |
+| `FALSE_POSITIVE` | Composite score < 35 — weak evidence, no alert |
+| `RESOLVED` | Previously CONFIRMED/PENDING but not re-detected for 24 h; deleted after 30 days |
+
 ## 🏗️ Architecture
 
 ```
@@ -113,7 +152,7 @@ pip install -r requirements.txt
    ```
    postgresql://postgres:YOURPASSWORD@db.xxxxxx.supabase.co:5432/postgres
    ```
-5. Create the tables by running this command (uses your `.env` from step 5):
+5. Create the tables by running this command (uses your `.env` from step 6):
    ```bash
    python -c "import psycopg2, os; from dotenv import load_dotenv; load_dotenv(); conn = psycopg2.connect(os.getenv('DATABASE_URL')); cur = conn.cursor(); cur.execute(open('schema.sql').read()); conn.commit(); print('Tables created')"
    ```
@@ -216,9 +255,10 @@ These constants in `pipeline.py` control the sensitivity of the detection engine
 | `CONFIDENCE_GATE` | 90 | Minimum VIIRS confidence % to process a hotspot |
 | `CLUSTER_DISTANCE_KM` | 2.0 | DBSCAN eps radius for spatial clustering |
 | `CLUSTER_MIN_SAMPLES` | 2 | Minimum hotspots to form a cluster core point |
-| `FRP_HIGH_ENERGY_MW` | 20.0 | FRP threshold for auto-confirmation |
+| `CLUSTER_TIME_WINDOW_H` | 2 | Maximum hours apart for hotspots to join the same cluster |
+| `FRP_HIGH_ENERGY_MW` | 20.0 | FRP threshold for the high-energy auto-confirm bypass |
 | `COMPOSITE_CONFIRM` | 65 | Composite score threshold for CONFIRMED status |
-| `COMPOSITE_PENDING` | 35 | Composite score threshold for PENDING status |
+| `COMPOSITE_PENDING` | 35 | Composite score threshold for PENDING status (below = FALSE_POSITIVE) |
 | `NOTIFICATION_COOLDOWN_H` | 6 | Hours between duplicate alerts for the same fire |
 
 ### Environment Variables
@@ -232,6 +272,28 @@ These constants in `pipeline.py` control the sensitivity of the detection engine
 | `CDSE_PASSWORD` | ✅ | Copernicus CDSE password |
 | `DATABASE_URL` | ✅ | PostgreSQL/Supabase connection string |
 | `SMOKE_MODEL_URL` | — | Direct download URL for a custom smoke detection model (optional) |
+
+## 🧪 Running Locally & Tests
+
+Run the pipeline once from the project root (it reads `.env` automatically):
+
+```bash
+python pipeline.py
+```
+
+Run the test suite:
+
+```bash
+python -m pytest tests/
+```
+
+Launch the dashboard locally:
+
+```bash
+streamlit run dashboard.py
+```
+
+The dashboard is bilingual (English / فارسی) and falls back to a clearly-labelled **demo mode** with simulated data when `DATABASE_URL` is not configured — useful for previewing the UI without any credentials.
 
 ## 🔥 Smoke Detection Model
 
@@ -249,10 +311,12 @@ You can also run `python download_model.py` to pre-download the model before you
 ```
 iran-fire-detection/
 ├── pipeline.py                  # Main detection pipeline orchestrator
-├── dashboard.py                 # Streamlit real-time dashboard
+├── dashboard.py                 # Streamlit real-time dashboard (bilingual EN/FA)
+├── download_model.py            # Smoke-detection model downloader
 ├── schema.sql                   # PostgreSQL/PostGIS database schema
 ├── requirements.txt             # Python dependencies
 ├── iran_forest_zone.geojson     # Forest boundary overlay for map
+├── flare_exclusion_zones.json   # Known gas-flare coordinates to suppress
 ├── .env.example                 # Environment variable template
 ├── .github/
 │   └── workflows/
@@ -261,15 +325,19 @@ iran-fire-detection/
 │   ├── config.py                # Configuration & secret management
 │   ├── firms_client.py          # NASA FIRMS API client (3-sensor)
 │   ├── copernicus_client.py     # Sentinel-2 imagery downloader
-│   ├── weather_client.py        # Open-Meteo weather enrichment
-│   ├── smoke_detector.py        # CV-based smoke plume analysis
+│   ├── weather_client.py        # Open-Meteo weather enrichment & risk index
+│   ├── smoke_detector.py        # YOLOv8 + CV smoke plume analysis
 │   ├── spatial_filter.py        # Geospatial forest boundary filter
+│   ├── flare_filter.py          # Gas-flare false-positive suppression
 │   ├── db_client.py             # PostgreSQL/PostGIS database client
 │   ├── telegram_notifier.py     # Telegram alert dispatcher
 │   └── social_verifier.py       # Citizen crowdsource verification
 ├── migrations/
-│   ├── migration_v2.sql         # Schema migration for v2 columns
+│   ├── migration_v2.sql … v7    # Incremental schema migrations
 │   └── add_detection_columns.py # Python migration script
+├── notebooks/
+│   └── smoke_detection_training.ipynb  # Train your own YOLOv8 model
+├── quicklooks/                  # Cached Sentinel-2 quicklook images
 └── tests/
     └── test_logic.py            # Unit tests
 ```
@@ -278,20 +346,11 @@ iran-fire-detection/
 
 ### GitHub Actions (Recommended)
 
-The included `.github/workflows/fire_detection_cron.yml` runs the pipeline every 30 minutes. Configure these **Repository Secrets** in your GitHub repo settings:
-
-- `NASA_FIRMS_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `CDSE_USERNAME`
-- `CDSE_PASSWORD`
-- `DATABASE_URL`
+The included [fire_detection_cron.yml](.github/workflows/fire_detection_cron.yml) runs the test suite and then the pipeline every 30 minutes. Add the six repository secrets listed in [step 7](#7-configure-github-secrets) and enable the workflow as described in [step 8](#8-enable-github-actions).
 
 ### Streamlit Cloud
 
-1. Push to GitHub
-2. Connect at [share.streamlit.io](https://share.streamlit.io)
-3. Set secrets in the Streamlit Cloud dashboard under **Settings → Secrets**
+See [step 9](#9-deploy-the-live-dashboard-optional) for the full walkthrough.
 
 ## 📊 Data Sources
 
@@ -300,6 +359,15 @@ The included `.github/workflows/fire_detection_cron.yml` runs the pipeline every
 | [NASA FIRMS](https://firms.modaps.eosdis.nasa.gov/) | VIIRS active fire hotspots (3 satellites) | Free |
 | [Copernicus CDSE](https://dataspace.copernicus.eu/) | Sentinel-2 L2A optical imagery | Free |
 | [Open-Meteo](https://open-meteo.com/) | Temperature, humidity, wind, precipitation | Free |
+
+## ⚠️ Accuracy & Limitations
+
+This is an **early-warning aid, not an official fire authority**. Keep in mind:
+
+- VIIRS has a ~375 m pixel footprint, so a single hotspot can represent anything from a small agricultural burn to a large wildfire.
+- Sentinel-2 verification depends on cloud cover and orbital timing — many clusters are scored without imagery.
+- Gas flares, industrial activity, and agricultural burning are suppressed via `flare_exclusion_zones.json`, but the list is not exhaustive.
+- Alerts are automated and unverified by humans. Always confirm with local authorities before acting.
 
 ## 🌲 Iran's Forest Regions
 
